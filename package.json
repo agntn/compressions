@@ -1,0 +1,147 @@
+{
+  "name": "@agntn/compressions",
+  "version": "0.0.0",
+  "description": "gzip, zlib, deflate, bzip2, xz, lzma, zstd, brotli, lz4 and Unix compress, written from the specs",
+  "keywords": [
+    "agent",
+    "brotli",
+    "bzip2",
+    "compression",
+    "deflate",
+    "gzip",
+    "lz4",
+    "lzma",
+    "lzw",
+    "mcp",
+    "xz",
+    "zlib",
+    "zstd"
+  ],
+  "homepage": "https://compressions.agntn.dev",
+  "bugs": "https://github.com/agntn/compressions/issues",
+  "license": "MIT",
+  "author": "oritwoen (https://github.com/oritwoen)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/agntn/compressions.git"
+  },
+  "bin": {
+    "compressions": "./dist/cli.mjs"
+  },
+  "files": [
+    "dist",
+    "packages/omp/extensions",
+    "packages/pi/extensions"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    },
+    "./deflate": {
+      "types": "./dist/deflate.d.mts",
+      "import": "./dist/deflate.mjs"
+    },
+    "./bzip2": {
+      "types": "./dist/bzip2.d.mts",
+      "import": "./dist/bzip2.mjs"
+    },
+    "./lzma": {
+      "types": "./dist/lzma.d.mts",
+      "import": "./dist/lzma.mjs"
+    },
+    "./zstd": {
+      "types": "./dist/zstd.d.mts",
+      "import": "./dist/zstd.mjs"
+    },
+    "./brotli": {
+      "types": "./dist/brotli.d.mts",
+      "import": "./dist/brotli.mjs"
+    },
+    "./lz4": {
+      "types": "./dist/lz4.d.mts",
+      "import": "./dist/lz4.mjs"
+    },
+    "./lzw": {
+      "types": "./dist/lzw.d.mts",
+      "import": "./dist/lzw.mjs"
+    },
+    "./ai": {
+      "types": "./dist/ai.d.mts",
+      "import": "./dist/ai.mjs"
+    },
+    "./mcp": {
+      "types": "./dist/mcp.d.mts",
+      "import": "./dist/mcp.mjs"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "obuild",
+    "dev": "obuild --stub",
+    "lint": "pnpm build && vp lint && vp fmt --check",
+    "fmt": "pnpm build && vp lint --fix && vp fmt",
+    "typecheck": "tsc --noEmit --skipLibCheck && pnpm build && tsc -p tsconfig.extensions.json && tsc -p test/tsconfig.json",
+    "test": "vp test run",
+    "test:watch": "vp test watch",
+    "prepack": "pnpm run build",
+    "release": "pnpm build && pnpm test && changelogen --release --push"
+  },
+  "dependencies": {
+    "@agntn/encodings": "0.1.0",
+    "@agntn/hashes": "0.6.4",
+    "@agntn/tools": "0.0.0",
+    "@modelcontextprotocol/server": "2.2.0",
+    "citty": "0.2.2",
+    "consola": "3.4.2"
+  },
+  "devDependencies": {
+    "@agntn/ox": "0.1.0",
+    "@earendil-works/pi-coding-agent": "0.84.2",
+    "@modelcontextprotocol/client": "2.2.0",
+    "@oh-my-pi/pi-coding-agent": "18.0.0",
+    "@types/node": "26.2.0",
+    "ai": "7.0.123",
+    "changelogen": "0.6.2",
+    "obuild": "0.4.43",
+    "typescript": "7.0.2",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": ">=0.84.2 <1",
+    "@oh-my-pi/pi-coding-agent": ">=18.0.0 <19",
+    "ai": ">=7.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@earendil-works/pi-coding-agent": {
+      "optional": true
+    },
+    "@oh-my-pi/pi-coding-agent": {
+      "optional": true
+    },
+    "ai": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=26"
+  },
+  "packageManager": "pnpm@12.8.1",
+  "omp": {
+    "extensions": [
+      "./packages/omp/extensions/compressions.ts"
+    ]
+  },
+  "pi": {
+    "extensions": [
+      "./packages/pi/extensions/compressions.ts"
+    ]
+  }
+}
