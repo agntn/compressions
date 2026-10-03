@@ -1,6 +1,6 @@
 /**
  * The static dictionary of RFC 7932 appendix A, 122784 bytes, deflated (level 9) and in base64.
- * Its CRC-32 is 0x5136cb04, as the RFC states; `test/brotli.test.ts` holds the inflated bytes to it.
+ * Its CRC-32 is 0x5136cb04, as the RFC states; `test/codecs.test.ts` holds the inflated bytes to it.
  */
 export const DICTIONARY_DEFLATED =
   "PL3nchxHti76exDBdyj1nC0Se4gGSMoNYSZoR9KW4RaombtnzoQiuyq7u4DqqlZlFcCmpAjQwBA0IEUv0HtKBEDQwpBAxOUL" +
