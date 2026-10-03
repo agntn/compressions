@@ -87,6 +87,8 @@ export interface IdentifyCandidate {
   byteLength: number;
   /** The start of the decompressed bytes: text when readable, else hex. */
   preview: string;
+  /** How `preview` is written. */
+  previewFormat: "utf8" | "hex";
   details: Record<string, string | number | boolean>;
 }
 
@@ -430,7 +432,8 @@ export function compressionsDecompress(
  */
 function candidateOf(candidate: CompressionCandidate): IdentifyCandidate {
   const head = candidate.bytes.subarray(0, PREVIEW_LENGTH);
-  const preview = readable(head)
+  const text = readable(head);
+  const preview = text
     ? new TextDecoder().decode(head)
     : hex.encode(head.subarray(0, PREVIEW_LENGTH / 2));
   return {
@@ -441,6 +444,7 @@ function candidateOf(candidate: CompressionCandidate): IdentifyCandidate {
     confirmed: candidate.confirmed,
     byteLength: candidate.bytes.length,
     preview,
+    previewFormat: text ? "utf8" : "hex",
     details: candidate.details,
   };
 }
@@ -455,7 +459,7 @@ function candidateOf(candidate: CompressionCandidate): IdentifyCandidate {
 function candidateText(candidate: IdentifyCandidate, index: number): string {
   const extra = detailLine(candidate.details);
   const mark = candidate.confirmed ? "" : ", unconfirmed";
-  return `${index}. ${candidate.format} container ${candidate.container}, confidence ${candidate.confidence}${mark}: ${candidate.reasons.join("; ")}${extra ? ` (${extra})` : ""}\n   ${candidate.byteLength} bytes: ${quote(candidate.preview)}`;
+  return `${index}. ${candidate.format} container ${candidate.container}, confidence ${candidate.confidence}${mark}: ${candidate.reasons.join("; ")}${extra ? ` (${extra})` : ""}\n   ${candidate.byteLength} bytes, ${candidate.previewFormat === "utf8" ? `text ${quote(candidate.preview)}` : `hex ${candidate.preview}`}`;
 }
 
 /**

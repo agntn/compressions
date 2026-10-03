@@ -190,6 +190,9 @@ describe("compressions MCP server", () => {
       "2 layers, outermost first:",
       expect.stringMatching(/^1\. lzma container xz, confidence 90/u),
     ]);
+    // A binary layer reads as hex, never as a quoted string a model would take for text.
+    expect(peeled.text).toContain(`${inner.length} bytes, hex 1f8b08`);
+    expect(peeled.text).toContain(`160 bytes, text "peel me peel me`);
     expect(peeled.text).toContain(
       `Innermost, 160 bytes as base64:\n${base64(new TextEncoder().encode("peel me ".repeat(20)))}`,
     );
