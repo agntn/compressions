@@ -1,0 +1,36 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "agntn-compressions",
+  "account_id": "6ef8d3cbe19975e93d994f25228488e7",
+  "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "NUXT_SITE_URL": "https://compressions.agntn.dev"
+  },
+  "workers_dev": true,
+  "preview_urls": true,
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "agntn-compressions",
+      "database_id": "daed36e0-6a15-4ae7-aa52-5e91b6ab997b"
+    }
+  ],
+  "routes": [{ "pattern": "compressions.agntn.dev", "custom_domain": true }],
+  "observability": {
+    "logs": {
+      "enabled": true,
+      "invocation_logs": true
+    }
+  },
+  "previews": {
+    "vars": {
+      "NUXT_SITE_URL": "https://compressions.agntn.dev"
+    },
+    "d1_databases": [
+      {
+        "binding": "DB",
+        "database_id": "08007e6c-14ce-4e39-bd3a-619b5c675f8a"
+      }
+    ]
+  }
+}
