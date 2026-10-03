@@ -1,5 +1,5 @@
 export type { BytesInput } from "./bytes.ts";
-export { DEFAULT_LIMIT } from "./bytes.ts";
+export { DEFAULT_LIMIT, Output } from "./bytes.ts";
 export {
   compressionFormats,
   type Compression,
