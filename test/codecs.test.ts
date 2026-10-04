@@ -381,6 +381,38 @@ describe("broken streams", () => {
     );
   });
 
+  it("hands back exactly the first limit bytes, even when a match or block crosses it", () => {
+    const input = new TextEncoder().encode(
+      "x".repeat(5000) + Buffer.from(random(30_000, 3)).toString("hex"),
+    );
+    const streams: Array<[Compression, string, Uint8Array]> = [
+      ...WRITERS.map(([format, container, options]): [Compression, string, Uint8Array] => [
+        format,
+        container,
+        format.compress(input, { container, ...options }),
+      ]),
+      [zstd, "zstd", new Uint8Array(zlib.zstdCompressSync(input))],
+      [brotli, "brotli", new Uint8Array(zlib.brotliCompressSync(input))],
+    ];
+    for (const [format, container, packed] of streams) {
+      for (const limit of [0, 100, 1000, 40_000]) {
+        const label = `${format.name} ${container} ${limit}`;
+        const options = { container, limit };
+        const { bytes } = format.decompress(packed, { ...options, partial: true });
+        expectBytes(bytes, input.subarray(0, limit), label);
+        let thrown: unknown;
+        try {
+          format.decompress(packed, options);
+        } catch (error) {
+          thrown = error;
+        }
+        expect(thrown, label).toBeInstanceOf(LimitError);
+        if (thrown instanceof LimitError)
+          expectBytes(thrown.partial, input.subarray(0, limit), label);
+      }
+    }
+  });
+
   it("names what it does not support", () => {
     const dictionary = new Uint8Array([0x28, 0xb5, 0x2f, 0xfd, 0x01, 0x58, 7, 1, 0, 0, 0]);
     expect(() => zstd.decompress(dictionary)).toThrow(UnsupportedError);

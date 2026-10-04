@@ -80,7 +80,6 @@ function decodeAlone(data: Uint8Array, out: Output): Details {
   if (!(low === 0xffffffff && high === 0xffffffff)) {
     if (high > 0x1fffff) throw out.fail("stated size is past 2^53", 5);
     size = high * 0x100000000 + low;
-    if (size > out.limit) out.reserve(size);
   }
   const model = new LzmaModel();
   model.reset(properties);
