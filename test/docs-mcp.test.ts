@@ -158,6 +158,15 @@ describe("docs MCP tools", () => {
       `   1024 bytes, text "${"a".repeat(200)}"`,
       "Next: compressions_decompress with the format and container, or set peel for nested layers. For a candidate cut at the limit, set partial to take the bytes under it.",
     ]);
+    const cutPeel = await callTool(
+      "compressions_identify",
+      { data: base64(cut), peel: true },
+      { limits: SMALL },
+    );
+    expect((cutPeel.content[0] as { text: string }).text.split("\n").slice(-2)).toEqual([
+      "Innermost, 1024 bytes, cut at the limit. The first 8 as base64:",
+      base64(new TextEncoder().encode("a".repeat(8))),
+    ]);
     const unbounded = await callTool("compressions_identify", { data: bomb, peel: true });
     expect((unbounded.content[0] as { text: string }).text).toMatch(/^1 layer,/u);
   });

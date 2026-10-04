@@ -481,15 +481,18 @@ function nothingFound(length: number, archive: string | undefined, what: string)
 }
 
 /**
- * Heads the innermost bytes, saying when the limit cut them.
+ * Heads the innermost bytes, saying when the limit cut them and how many the base64 holds.
  *
  * @param length - How many bytes the layer gave.
+ * @param shown - Most bytes the answer shows.
  * @param limited - Whether the limit cut it.
  * @returns {string} The line.
  */
-function innermostLine(length: number, limited: boolean): string {
-  const size = limited ? `the first ${length} bytes, cut at the limit,` : `${length} bytes`;
-  return `Innermost, ${size} as base64:`;
+function innermostLine(length: number, shown: number, limited: boolean): string {
+  const cut = limited ? ", cut at the limit" : "";
+  return shown < length
+    ? `Innermost, ${length} bytes${cut}. The first ${shown} as base64:`
+    : `Innermost, ${length} bytes as base64${cut}:`;
 }
 
 /**
@@ -519,7 +522,7 @@ function peelLayers(
           ...layers.map((layer, index) => candidateText(layer, index + 1)),
         ];
   if (innermost && encoded)
-    lines.push(innermostLine(innermost.bytes.length, innermost.limited), encoded);
+    lines.push(innermostLine(innermost.bytes.length, limits.shown, innermost.limited), encoded);
   return {
     content: [{ type: "text", text: lines.join("\n") }],
     details: {
