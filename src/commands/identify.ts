@@ -45,9 +45,14 @@ function archiveNote(data: Uint8Array, suffix = ""): string {
 function peelTo(data: Uint8Array, depth: number): void {
   const layers = peel(data, { depth });
   for (const layer of layers) process.stderr.write(`${line(layer)}\n`);
-  const inner = layers.findLast((layer) => layer.confirmed)?.bytes;
+  const inner = layers.findLast((layer) => layer.confirmed);
   if (inner) {
-    process.stdout.write(inner);
+    process.stdout.write(inner.bytes);
+    if (!inner.limited) return;
+    process.stderr.write(
+      `Cut at the limit: that was only the first ${inner.bytes.length} bytes.\n`,
+    );
+    process.exitCode = 1;
     return;
   }
   process.stderr.write(`No confirmed layer.${archiveNote(data)}\n`);

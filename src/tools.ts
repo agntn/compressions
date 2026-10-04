@@ -241,7 +241,7 @@ export const identifyTool = defineTool({
   snippet: "Use compressions_identify on compressed bytes whose format nobody named.",
   guidelines: [
     "The confidence ranks candidates; it is not a probability. A magic number with a matching checksum is the strongest evidence.",
-    "Raw deflate and brotli have no magic number; they count only when they decode to the last byte.",
+    "Raw deflate and brotli have no magic number; they count only when they decode to the last byte or fill the output limit.",
     "With peel, a last layer marked unconfirmed is only the best guess.",
   ],
   effect: "read",

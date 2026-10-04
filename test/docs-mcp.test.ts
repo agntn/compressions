@@ -142,8 +142,21 @@ describe("docs MCP tools", () => {
       { data: bomb, peel: true },
       { limits: SMALL },
     );
-    expect(peeled.content).toEqual([
-      { type: "text", text: `No compression layer found in ${packed.length} bytes.` },
+    const [layer] = (peeled.content[0] as { text: string }).text.split("\n").slice(1);
+    expect(layer).toBe(
+      "1. deflate container raw, confidence 5, unconfirmed: output passes the limit of 1024 bytes, cut there; comes out longer than it went in",
+    );
+    const cut = deflate.compress("a".repeat(2000), { container: "gzip" });
+    const identified = await callTool(
+      "compressions_identify",
+      { data: base64(cut) },
+      { limits: SMALL },
+    );
+    expect((identified.content[0] as { text: string }).text.split("\n")).toEqual([
+      "1 candidate, best first:",
+      "1. deflate container gzip, confidence 65: starts with its magic number; output passes the limit of 1024 bytes, cut there; decompresses to readable text; comes out longer than it went in",
+      `   1024 bytes, text "${"a".repeat(200)}"`,
+      "Next: compressions_decompress with the format and container, or set peel for nested layers. For a candidate cut at the limit, set partial to take the bytes under it.",
     ]);
     const unbounded = await callTool("compressions_identify", { data: bomb, peel: true });
     expect((unbounded.content[0] as { text: string }).text).toMatch(/^1 layer,/u);

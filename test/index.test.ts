@@ -199,6 +199,39 @@ describe("identify", () => {
     expect(archiveOf(text)).toBeUndefined();
   });
 
+  it("keeps a stream that passes the limit, cut there and marked, instead of dropping it", () => {
+    const big = new TextEncoder().encode("a".repeat(5000));
+    const gz = deflate.compress(big, { container: "gzip" });
+    const [best, ...rest] = identify(gz, { limit: 4096 });
+    expect(rest).toEqual([]);
+    expect(best).toMatchObject({
+      format: "deflate",
+      container: "gzip",
+      confirmed: true,
+      limited: true,
+      reasons: [
+        "starts with its magic number",
+        "output passes the limit of 4096 bytes, cut there",
+        "decompresses to readable text",
+        "comes out longer than it went in",
+      ],
+    });
+    expect(best!.bytes).toEqual(big.subarray(0, 4096));
+    expect(identify(gz)[0]).toMatchObject({ confirmed: true, limited: false, confidence: 100 });
+    const [zlibCut] = identify(deflate.compress(big, { container: "zlib" }), { limit: 4096 });
+    expect(zlibCut).toMatchObject({ container: "zlib", confirmed: false, limited: true });
+  });
+
+  it("stops peeling at a layer cut by the limit, even when its prefix would peel", () => {
+    const inner = deflate.compress("peel me", { container: "gzip" });
+    const padded = new Uint8Array([...inner, ...new TextEncoder().encode("a".repeat(5000))]);
+    const outer = deflate.compress(padded, { container: "gzip" });
+    expect(identify(padded.subarray(0, 4096))[0]).toMatchObject({ container: "gzip" });
+    const layers = peel(outer, { limit: 4096 });
+    expect(layers.map((layer) => [layer.container, layer.limited])).toEqual([["gzip", true]]);
+    expect(layers[0]!.bytes).toEqual(padded.subarray(0, 4096));
+  });
+
   it("peels layers outermost first and stops at plain data", () => {
     const inner = deflate.compress(text, { container: "gzip" });
     const middle = lzma.compress(inner, { container: "xz" });
