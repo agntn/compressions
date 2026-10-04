@@ -23,9 +23,11 @@ import {
   MAX_OUTPUT_BYTES,
   MAX_SHOWN_BYTES,
   OUTPUT_FORMATS,
+  TOOL_LIMITS,
   type DataFormat,
   type InputFormat,
   type OutputFormat,
+  type ToolLimits,
 } from "./tool-contract.ts";
 
 /** The contract the playground and the docs read, so a limit changes in one place. */
@@ -301,13 +303,15 @@ function detailLine(details: Readonly<Record<string, string | number | boolean>>
  * Compresses text or bytes.
  *
  * @param params - Tool arguments.
+ * @param limits - The limits to enforce, the tool contract's unless the host asks for less.
  * @returns {ToolResult<CompressDetails>} The compressed bytes in base64 or hex.
  */
 export function compressionsCompress(
   params: Readonly<Record<string, unknown>>,
+  limits: ToolLimits = TOOL_LIMITS,
 ): ToolResult<CompressDetails> {
   const name = stringArgument("format", params["format"], MAX_NAME_LENGTH);
-  const input = stringArgument("input", params["input"], MAX_INPUT_LENGTH, 0);
+  const input = stringArgument("input", params["input"], limits.input, 0);
   const inputFormat = enumArgument("inputFormat", params["inputFormat"], INPUT_FORMATS, "utf8");
   const dataFormat = enumArgument("dataFormat", params["dataFormat"], DATA_FORMATS, "base64");
   const format = create(name);
@@ -365,26 +369,24 @@ function written(bytes: Uint8Array, wanted: OutputFormat): [Exclude<OutputFormat
  * Decompresses bytes in a named format and shows a window of the result.
  *
  * @param params - Tool arguments.
+ * @param limits - The limits to enforce, the tool contract's unless the host asks for less.
  * @returns {ToolResult<DecompressDetails>} The bytes as text, hex or base64.
  */
 export function compressionsDecompress(
   params: Readonly<Record<string, unknown>>,
+  limits: ToolLimits = TOOL_LIMITS,
 ): ToolResult<DecompressDetails> {
   const name = stringArgument("format", params["format"], MAX_NAME_LENGTH);
   const dataFormat = enumArgument("dataFormat", params["dataFormat"], DATA_FORMATS, "base64");
-  const data = bytesOf(
-    "data",
-    stringArgument("data", params["data"], MAX_INPUT_LENGTH),
-    dataFormat,
-  );
+  const data = bytesOf("data", stringArgument("data", params["data"], limits.input), dataFormat);
   const wanted = enumArgument("outputFormat", params["outputFormat"], OUTPUT_FORMATS, "auto");
-  const offset = integerArgument("offset", params["offset"], 0, MAX_OUTPUT_BYTES, 0);
+  const offset = integerArgument("offset", params["offset"], 0, limits.output, 0);
   const length = integerArgument(
     "length",
     params["length"],
     1,
-    MAX_SHOWN_BYTES,
-    DEFAULT_SHOWN_BYTES,
+    limits.shown,
+    Math.min(DEFAULT_SHOWN_BYTES, limits.shown),
   );
   const partial = params["partial"] === true;
   const format = create(name);
@@ -393,7 +395,7 @@ export function compressionsDecompress(
   const container = (taken["container"] as string | undefined) ?? info.containers[0]!.name;
   const { bytes, details } = format.decompress(data, {
     container,
-    limit: MAX_OUTPUT_BYTES,
+    limit: limits.output,
     partial,
   });
   const window = bytes.subarray(offset, offset + length);
@@ -481,17 +483,19 @@ function nothingFound(length: number, archive: string | undefined, what: string)
  * @param data - The bytes.
  * @param depth - Most layers.
  * @param archive - An archive format the bytes start like.
+ * @param limits - The limits to enforce.
  * @returns {ToolResult<IdentifyDetails>} The layers.
  */
 function peelLayers(
   data: Uint8Array,
   depth: number,
   archive: string | undefined,
+  limits: ToolLimits,
 ): ToolResult<IdentifyDetails> {
-  const peeled = peel(data, { limit: MAX_OUTPUT_BYTES, depth });
+  const peeled = peel(data, { limit: limits.output, depth });
   const layers = peeled.map(candidateOf);
   const inner = peeled.findLast((layer) => layer.confirmed)?.bytes;
-  const encoded = inner ? base64.encode(inner.subarray(0, MAX_SHOWN_BYTES)) : undefined;
+  const encoded = inner ? base64.encode(inner.subarray(0, limits.shown)) : undefined;
   const lines =
     layers.length === 0
       ? [nothingFound(data.length, archive, "No compression layer found in")]
@@ -515,28 +519,25 @@ function peelLayers(
  * Lists what compressed some bytes, or peels every layer.
  *
  * @param params - Tool arguments.
+ * @param limits - The limits to enforce, the tool contract's unless the host asks for less.
  * @returns {ToolResult<IdentifyDetails>} The candidates or the layers.
  */
 export function compressionsIdentify(
   params: Readonly<Record<string, unknown>>,
+  limits: ToolLimits = TOOL_LIMITS,
 ): ToolResult<IdentifyDetails> {
   const dataFormat = enumArgument("dataFormat", params["dataFormat"], DATA_FORMATS, "base64");
-  const data = bytesOf(
-    "data",
-    stringArgument("data", params["data"], MAX_INPUT_LENGTH),
-    dataFormat,
-  );
+  const data = bytesOf("data", stringArgument("data", params["data"], limits.input), dataFormat);
   const archive = archiveOf(data);
   if (params["peel"] === true) {
     return peelLayers(
       data,
       integerArgument("depth", params["depth"], 1, MAX_LAYERS, MAX_LAYERS),
       archive,
+      limits,
     );
   }
-  const candidates = identify(data, { limit: MAX_OUTPUT_BYTES })
-    .slice(0, MAX_LAYERS)
-    .map(candidateOf);
+  const candidates = identify(data, { limit: limits.output }).slice(0, MAX_LAYERS).map(candidateOf);
   const listed = candidates
     .map((candidate, index) => candidateText(candidate, index + 1))
     .join("\n");

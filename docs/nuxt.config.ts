@@ -9,6 +9,8 @@ export default defineNuxtConfig({
   /** The repo root is its own pnpm workspace; Nuxt must not treat it as this site's. */
   workspaceDir: import.meta.dirname,
   alias: {
+    /** The tool listings and the executor `compressions mcp` serves, for the MCP server at /mcp. */
+    "@agntn/compressions/mcp": resolve(librarySource, "mcp.ts"),
     "@agntn/compressions": resolve(librarySource, "index.ts"),
     /** The text the agent tools answer with; it imports nothing beyond the library. */
     "#tool-operations": resolve(librarySource, "tool-operations.ts"),
@@ -17,7 +19,12 @@ export default defineNuxtConfig({
     build: { target: "es2024" },
     resolve: {
       /** `../src` imports them; Vite would look for them from the repo root upward. */
-      dedupe: ["@agntn/hashes", "@agntn/encodings"],
+      dedupe: [
+        "@agntn/hashes",
+        "@agntn/encodings",
+        "@agntn/tools",
+        "@modelcontextprotocol/server",
+      ],
     },
     optimizeDeps: {
       include: [
@@ -46,6 +53,18 @@ export default defineNuxtConfig({
     description:
       "Compress, decompress and identify gzip, zlib, raw deflate, bzip2, xz, .lzma, zstd, brotli, lz4 and Unix compress, written from the specs, as a library, a CLI, an MCP server and Pi and OMP extensions. Computed locally.",
     sections: [
+      {
+        title: "MCP Server",
+        description: "The tools of `compressions mcp` and the page tools of this site over Streamable HTTP.",
+        links: [
+          {
+            title: "MCP endpoint",
+            href: "https://compressions.agntn.dev/mcp",
+            description:
+              "Add it to any MCP client as an HTTP server, for example `claude mcp add --transport http compressions https://compressions.agntn.dev/mcp`.",
+          },
+        ],
+      },
       {
         title: "Playground",
         description: "Compress, decompress, identify and list the formats, in the browser.",
@@ -110,6 +129,7 @@ export default defineNuxtConfig({
         "lucide:text",
         "lucide:x",
         "lucide:zap",
+        "simple-icons:cursor",
         "simple-icons:github",
         "simple-icons:npm",
         "vscode-icons:file-type-js",
@@ -138,12 +158,15 @@ export default defineNuxtConfig({
       ],
     },
   },
-  /** Docus ships an MCP endpoint that wants the Cloudflare Agents SDK on Workers. Not needed. */
-  mcp: {
-    enabled: false,
-  },
   nitro: {
     preset: "cloudflare_module",
+    /** One MCP SDK copy, or `agents` fails the toolkit's server on its `instanceof` check. */
+    alias: {
+      "@modelcontextprotocol/sdk": resolve(
+        import.meta.dirname,
+        "node_modules/@modelcontextprotocol/sdk/dist/esm",
+      ),
+    },
     compatibilityDate: "2026-09-03",
     /** Nitro compiles the server bundle for ES2019 unless told otherwise; the library uses BigInt. */
     esbuild: { options: { target: "es2024" } },
