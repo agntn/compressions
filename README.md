@@ -133,6 +133,7 @@ Call `defineCompression` with the metadata and two functions, then `register`. T
 
 ```bash
 pnpm install
+pnpm --dir docs install   # the /mcp test borrows Zod, the toolkit and the SDK from here
 pnpm build       # dist/, the CLI and the subpaths
 pnpm test        # RFC tables, frozen streams from gzip, bzip2, xz, zstd, brotli, lz4 and ncompress, round trips
 pnpm lint        # vp lint and vp fmt --check
