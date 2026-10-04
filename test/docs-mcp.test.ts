@@ -1,8 +1,20 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
-import { afterEach, describe, expect, it } from "vite-plus/test";
+import { Client as SiteClient } from "../docs/node_modules/@modelcontextprotocol/sdk/dist/esm/client/index.js";
+import { InMemoryTransport as SiteTransport } from "../docs/node_modules/@modelcontextprotocol/sdk/dist/esm/inMemory.js";
+import { McpServer } from "../docs/node_modules/@modelcontextprotocol/sdk/dist/esm/server/mcp.js";
+import type { CallToolResult } from "../docs/node_modules/@modelcontextprotocol/sdk/dist/esm/types.js";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { deflate } from "../src/index.ts";
 import { callTool, createMcpServer, toolListings } from "../src/mcp.ts";
+
+/* The toolkit's entry pulls in Nitro, and `defineMcpTool` only hands its input back. */
+vi.mock(
+  "../docs/node_modules/@nuxtjs/mcp-toolkit/dist/runtime/server/mcp/definitions/index.js",
+  () => ({
+    defineMcpTool: (definition: unknown) => definition,
+  }),
+);
 
 const toolsDir = new URL("../docs/server/mcp/tools/", import.meta.url);
 
@@ -11,6 +23,24 @@ const openConnections: Array<{ close(): Promise<void> }> = [];
 afterEach(async () => {
   await Promise.all(openConnections.splice(0).map((connection) => connection.close()));
 });
+
+/* An SDK client on every docs tool, through the same SDK copy the worker runs. */
+async function siteClient(): Promise<SiteClient> {
+  const { compressionsMcpTool } = await import("../docs/server/utils/compressions-mcp.ts");
+  const server = new McpServer({ name: "compressions-docs", version: "0.0.0" });
+  for (const listing of toolListings) {
+    const tool = compressionsMcpTool(listing.name);
+    const handler = tool.handler as (
+      args: Readonly<Record<string, unknown>>,
+    ) => Promise<CallToolResult>;
+    server.registerTool(listing.name, tool, handler);
+  }
+  const [clientTransport, serverTransport] = SiteTransport.createLinkedPair();
+  const client = new SiteClient({ name: "compressions-docs-test", version: "0.0.0" });
+  openConnections.push(client, server);
+  await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+  return client;
+}
 
 const base64 = (bytes: Uint8Array): string => Buffer.from(bytes).toString("base64");
 
@@ -58,6 +88,17 @@ describe("docs MCP tools", () => {
       const viaServer = await client.callTool({ name, arguments: args });
       expect(await callTool(name, args), name).toEqual(viaServer);
     }
+  });
+
+  it("reads a call without arguments as `{}`, like `compressions mcp`", async () => {
+    const client = await siteClient();
+    const served = await client.callTool({ name: "compressions_info" });
+    expect(served.isError).toBeFalsy();
+    expect(served.content).toEqual((await callTool("compressions_info", {})).content);
+
+    const required = await client.callTool({ name: "compressions_identify" });
+    expect(required.isError).toBe(true);
+    expect(required.content).toEqual((await callTool("compressions_identify", {})).content);
   });
 
   it("holds a call to the host's limits when it passes tighter ones", async () => {

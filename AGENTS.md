@@ -48,7 +48,7 @@ Keep AGENTS.md updated with project status.
 
 - `pnpm dev` - `obuild --stub`, so `dist` re-exports `src`
 - `pnpm build` - production build
-- `pnpm test` - run tests once
+- `pnpm test` - run tests once. It and `pnpm typecheck` want `pnpm --dir docs install` too: `test/docs-mcp.test.ts` takes Zod, the toolkit and the MCP SDK from `docs/node_modules`
 - `pnpm test:watch` - run tests in watch mode
 - `pnpm lint` - build, lint + format check
 - `pnpm fmt` - auto-fix lint + format
