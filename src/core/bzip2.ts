@@ -296,9 +296,7 @@ function writeBlockBytes(next: Uint32Array, origin: number, out: Output): void {
     const byte = entry & 0xff;
     position = entry >>> 8;
     if (same === 4) {
-      out.reserve(byte);
-      out.bytes.fill(previous, out.length, out.length + byte);
-      out.length += byte;
+      out.copyByte(previous, byte);
       same = 0;
       previous = -1;
     } else {

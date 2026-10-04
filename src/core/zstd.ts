@@ -1041,7 +1041,6 @@ function checkFrame(
  */
 function readFrame(data: Uint8Array, start: number, out: Output, details: Details): number {
   const header = readFrameHeader(data, start, out);
-  if (header.contentSize > out.limit - out.length) out.reserve(header.contentSize);
   const state: FrameState = {
     reps: [1, 4, 8],
     windowSize: header.windowSize,

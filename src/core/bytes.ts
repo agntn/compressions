@@ -105,15 +105,22 @@ export class Output {
    */
   reserve(count: number): void {
     const needed = this.length + count;
-    if (needed > this.limit) {
-      throw new LimitError(this.format, this.limit, { partial: this.take() });
-    }
+    if (needed > this.limit) throw this.overflow();
     if (needed <= this.bytes.length) return;
     let size = this.bytes.length * 2;
     while (size < needed) size *= 2;
     const grown = new Uint8Array(Math.min(size, Math.max(needed, this.limit)));
     grown.set(this.bytes.subarray(0, this.length));
     this.bytes = grown;
+  }
+
+  /**
+   * Builds the error for output past the limit, carrying the first `limit` bytes.
+   *
+   * @returns {LimitError} The error, for the caller to throw.
+   */
+  private overflow(): LimitError {
+    return new LimitError(this.format, this.limit, { partial: this.take() });
   }
 
   /**
@@ -132,6 +139,10 @@ export class Output {
    * @param chunk - The bytes.
    */
   append(chunk: Uint8Array): void {
+    if (this.length + chunk.length > this.limit) {
+      this.append(chunk.subarray(0, this.limit - this.length));
+      throw this.overflow();
+    }
     this.reserve(chunk.length);
     this.bytes.set(chunk, this.length);
     this.length += chunk.length;
@@ -144,6 +155,10 @@ export class Output {
    * @param count - How many times.
    */
   copyByte(byte: number, count: number): void {
+    if (this.length + count > this.limit) {
+      this.copyByte(byte, this.limit - this.length);
+      throw this.overflow();
+    }
     this.reserve(count);
     this.bytes.fill(byte, this.length, this.length + count);
     this.length += count;
@@ -157,6 +172,10 @@ export class Output {
    * @param count - How many bytes to copy.
    */
   copy(distance: number, count: number): void {
+    if (this.length + count > this.limit) {
+      this.copy(distance, this.limit - this.length);
+      throw this.overflow();
+    }
     this.reserve(count);
     const out = this.bytes;
     let to = this.length;
