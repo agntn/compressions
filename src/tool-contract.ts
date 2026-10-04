@@ -10,6 +10,23 @@ export const MAX_OUTPUT_BYTES = 64 * 1024 * 1024;
 export const DEFAULT_SHOWN_BYTES = 16 * 1024;
 export const MAX_SHOWN_BYTES = 1024 * 1024;
 
+/** The limits an executor enforces. A host with less memory than a desktop passes tighter ones. */
+export interface ToolLimits {
+  /** Longest input, in characters of its text form. */
+  readonly input: number;
+  /** Most bytes one stream decompresses to. */
+  readonly output: number;
+  /** Most decompressed bytes one answer shows. */
+  readonly shown: number;
+}
+
+/** The limits the schemas advertise, and every surface applies unless its host asks for less. */
+export const TOOL_LIMITS: ToolLimits = {
+  input: MAX_INPUT_LENGTH,
+  output: MAX_OUTPUT_BYTES,
+  shown: MAX_SHOWN_BYTES,
+};
+
 /** Longest format name a tool takes. */
 export const MAX_NAME_LENGTH = 40;
 

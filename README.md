@@ -25,7 +25,7 @@ Everything is on [compressions.agntn.dev](https://compressions.agntn.dev), playg
 - 🔍 **`identify` and `peel`.** Every container gets a real try. You get a ranking with reasons. Three layers deep? `peel` takes them off.
 - 🩹 **Partial reads.** A stream cut in half still gives you the first half.
 - 💣 **Bomb proof.** Output stops at a limit you set, 256 MiB by default.
-- 🤖 **Agent tools.** Four of them. MCP, Pi, OMP or the AI SDK, pick your host.
+- 🤖 **Agent tools.** Four of them. MCP, Pi, OMP or the AI SDK, pick your host. Or skip the install, the site serves them at `/mcp`.
 - 🌐 **Runs anywhere.** Zero `node:*` imports in the library. Browsers, Workers, Node, all fine.
 
 ## 📦 Install
@@ -118,6 +118,8 @@ omp install @agntn/compressions
 ```
 
 Four tools: `compressions_compress`, `compressions_decompress`, `compressions_identify`, `compressions_info`. For the AI SDK, import them from `@agntn/compressions/ai`. Bytes travel as base64. A bomb stops at 64 MiB, and long output comes in windows. What the model reads back is in the [agents guide](https://compressions.agntn.dev/guide/agents).
+
+No Node at hand? `claude mcp add --transport http compressions https://compressions.agntn.dev/mcp` and the site serves the same four. The limits are tighter there and your bytes ride to a Cloudflare worker, so [read the fine print](https://compressions.agntn.dev/guide/agents#remote-mcp) first.
 
 ## 🚫 What this does not do
 

@@ -20,7 +20,14 @@ import {
   MAX_OUTPUT_BYTES,
   MAX_SHOWN_BYTES,
   OUTPUT_FORMATS,
+  type ToolLimits,
 } from "./tool-contract.ts";
+
+/** Call context, plus the limits of a host with less room than the tool contract. */
+export interface CompressionCallContext {
+  readonly signal?: Readonly<AbortSignal>;
+  readonly limits?: ToolLimits;
+}
 
 type ToolOperations = typeof import("./tool-operations.ts");
 
@@ -204,7 +211,8 @@ export const compressTool = defineTool({
   ],
   effect: "read",
   input: compressSchema,
-  execute: async (params) => (await loadOperations()).compressionsCompress(params),
+  execute: async (params, context: CompressionCallContext) =>
+    (await loadOperations()).compressionsCompress(params, context.limits),
 });
 
 export const decompressTool = defineTool({
@@ -221,7 +229,8 @@ export const decompressTool = defineTool({
   ],
   effect: "read",
   input: decompressSchema,
-  execute: async (params) => (await loadOperations()).compressionsDecompress(params),
+  execute: async (params, context: CompressionCallContext) =>
+    (await loadOperations()).compressionsDecompress(params, context.limits),
 });
 
 export const identifyTool = defineTool({
@@ -237,7 +246,8 @@ export const identifyTool = defineTool({
   ],
   effect: "read",
   input: identifySchema,
-  execute: async (params) => (await loadOperations()).compressionsIdentify(params),
+  execute: async (params, context: CompressionCallContext) =>
+    (await loadOperations()).compressionsIdentify(params, context.limits),
 });
 
 export const infoTool = defineTool({

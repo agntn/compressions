@@ -1,13 +1,13 @@
 # docs/
 
-Docus site for `@agntn/compressions` at compressions.agntn.dev. Markdown lives in `content/`. The playground is a Vue page that imports the library into the browser. There's no server API, because the library needs none.
+Docus site for `@agntn/compressions` at compressions.agntn.dev. Markdown lives in `content/`. The playground is a Vue page that imports the library into the browser. The one route that answers at request time is `/mcp`, the Docus MCP server with every tool of `compressions mcp` beside its own `list-pages` and `get-page`.
 
 ## Layout
 
 ```
 docs/
 ├── DESIGN.md                      # the instruments this site owns and where it departs from the agntn design system
-├── nuxt.config.ts                 # extends: ['docus'], cloudflare_module preset (Workers), @agntn/compressions and #tool-operations aliased to ../src
+├── nuxt.config.ts                 # extends: ['docus'], cloudflare_module preset (Workers), @agntn/compressions, its /mcp and #tool-operations aliased to ../src
 ├── shiki-theme.ts                 # code block theme, every colour a --shiki-token-* variable from app.css
 ├── app/app.config.ts              # title, github, theme, the Nuxt UI variants in the instrument grammar
 ├── app/app.css                    # theme tokens, the shared `console-*` and `hero-*` grammar, `compressions-*` classes
@@ -19,6 +19,9 @@ docs/
 ├── app/utils/                     # formats table (icons, blurbs, groups, containers, sample streams, anatomy, ratio over the library's info()), tools (the agent tools' text), tokens, roster, formatting
 ├── app/pages/playground.vue       # playground, own route outside the docs layout, its own useSeo and OG image
 ├── server/routes/sitemap.xml.ts   # Docus sitemap plus the Vue pages it cannot see
+├── server/mcp/index.ts            # the Docus MCP handler at /mcp, named and versioned like `compressions mcp`
+├── server/mcp/tools/              # one file per tool, each `compressionsMcpTool("<name>")`
+├── server/utils/compressions-mcp.ts # a tool from `@agntn/compressions/mcp` with the worker's limits
 ├── public/                        # fonts, favicon.svg and the icons and manifest cut from it
 ├── content/index.md               # landing
 ├── content/1.guide/               # getting started, compressing, containers, checksums, identify, limits, CLI, agents, custom, playground
@@ -46,6 +49,18 @@ Two resolution traps, both because the repo root is its own pnpm workspace:
 
 - `pnpm-workspace.yaml` sets `shamefullyHoist: true`. Without it `docs/node_modules` holds only direct dependencies, Node walks up to the root `node_modules`, and the server bundle can end up with a second copy of Vue.
 - `nuxt.config.ts` pins `workspaceDir` to `docs/`, disables devtools and telemetry, and adds `../src` to `vite.server.fs.allow`, since `pnpm dev` couldn't load the library otherwise.
+
+## MCP
+
+`@agntn/compressions/mcp` is a third alias, for `../src/mcp.ts`. A file in `server/mcp/tools/` names one tool and nothing else: `compressionsMcpTool()` takes the name, prose, schema and annotations from `toolListings` and runs `callTool()` from there, so a tool changed in `src/` changes here without an edit. A new tool in `src/tools.ts` needs one more file here, and `test/docs-mcp.test.ts` fails until it has one.
+
+`@nuxtjs/mcp-toolkit` wants Zod and validates with it before the handler runs. A Zod error echoes the client's keys as they came and reads differently from `compressions mcp`. So the Zod schema is `z.looseObject({})`, which passes any object, and its `_zod.toJSONSchema` hook returns the wire schema from `toolListings`, so `tools/list` still shows the real one. `callTool` then checks the arguments the way stdio does. The one difference: a call with no `arguments` at all fails Zod's object check, where stdio reads it as `{}`.
+
+`WORKER_LIMITS` in `server/utils/compressions-mcp.ts` holds a call to 262,144 input characters, 4 MiB of output and 256 KiB shown. An isolate gets 128 MB. Under Node at the contract's 64 MiB, a gzip bomb took 135 MB on top of the baseline, `identify` 200 MB and a two layer `peel` 305 MB, and 2.9 MB of random bytes compressed to base64 ran out of a 128 MB V8 heap: `radix2` in `@agntn/encodings` builds its string one character at a time. At the worker's limits a ten layer `peel` of 4 MiB layers holds 40 MB of buffers and the heap stays under 48 MB. Raise a limit only after the same measurement. The tool descriptions keep saying 64 MiB; the error names the limit that hit.
+
+`src/mcp.ts` imports `@agntn/tools` and `@modelcontextprotocol/server`. Both are dependencies here, pinned to the root's versions and listed in `vite.resolve.dedupe`. They run on the worker only, so they stay out of `optimizeDeps`. On the `cloudflare_module` preset the toolkit hands its server to `createMcpHandler` from `agents`, which tells an SDK v1 server apart with `instanceof`. pnpm installs one copy of `@modelcontextprotocol/sdk` per `zod` peer it resolves, so the toolkit and `agents` can each get their own and every request fails with "createMcpHandler received an unsupported server". `nitro.alias` points every import of the SDK at the copy in `docs/node_modules`. Keep it until both resolve the same one; `.output/server` should hold one `class McpServer`.
+
+The worker decompresses whatever an MCP client sends it and keeps none of it. Workers Logs record the invocation, not the body; keep it that way, no `console` call with tool arguments. The pages still compute everything in the tab, which is what the footer promises.
 
 ## Live values
 
