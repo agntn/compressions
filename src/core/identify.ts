@@ -3,9 +3,9 @@
  * ranked by what the attempt showed. `peel` repeats it while each layer is backed by evidence.
  */
 import { compressedBytes, DEFAULT_LIMIT, limitOption } from "./bytes.ts";
-import { DecompressError } from "./errors.ts";
+import { DecompressError, LimitError } from "./errors.ts";
 import { create, formats } from "./registry.ts";
-import type { Decompressed } from "./types.ts";
+import type { Details } from "./types.ts";
 
 /** How sure the start of the bytes makes a container. */
 type Fit = "magic" | "header" | "none";
@@ -26,6 +26,8 @@ export interface CompressionCandidate {
   details: Record<string, string | number | boolean>;
   /** Whether a magic number, or a checked header and checksum, backs it. */
   confirmed: boolean;
+  /** Whether the output passed the limit, so `bytes` holds only its first `limit` bytes. */
+  limited: boolean;
 }
 
 /** Options of `identify`. */
@@ -157,22 +159,27 @@ export function readable(bytes: Uint8Array): boolean {
   }
 }
 
+/** What one probe gave back. */
+interface Outcome {
+  bytes: Uint8Array;
+  details: Details;
+  /** Whether the output passed the limit and stopped there. */
+  limited?: boolean;
+}
+
 /**
- * Decompresses with one probe, or gives nothing when the bytes are not that container.
+ * Decompresses with one probe: nothing for another container, the prefix for one too big.
  *
  * @param probe - The container.
  * @param bytes - The input.
  * @param limit - Most bytes to write.
- * @returns {Decompressed | undefined} What came out.
+ * @returns {Outcome | undefined} What came out, cut at the limit when it got that far.
  */
-function tryProbe(
-  probe: Readonly<Probe>,
-  bytes: Uint8Array,
-  limit: number,
-): Decompressed | undefined {
+function tryProbe(probe: Readonly<Probe>, bytes: Uint8Array, limit: number): Outcome | undefined {
   try {
     return create(probe.format).decompress(bytes, { container: probe.container, limit });
   } catch (error) {
+    if (error instanceof LimitError) return { bytes: error.partial, details: {}, limited: true };
     if (error instanceof DecompressError) return undefined;
     throw error;
   }
@@ -193,7 +200,51 @@ function confirmed(fit: Fit, checksum: boolean, cleanText: boolean): boolean {
 }
 
 /**
- * Tries one probe and scores what came out.
+ * Scores what one probe gave back. A cut stream earns nothing for a checksum or its last byte.
+ *
+ * @param probe - The container.
+ * @param fit - How its start fit.
+ * @param result - What came out.
+ * @param input - The input length and the limit.
+ * @returns {CompressionCandidate} The candidate.
+ */
+function scored(
+  probe: Readonly<Probe>,
+  fit: Fit,
+  result: Readonly<Outcome>,
+  input: Readonly<{ length: number; limit: number; trailing: number }>,
+): CompressionCandidate {
+  const { length, limit, trailing } = input;
+  const limited = result.limited === true;
+  const checksum = probe.checksum && !limited;
+  const whole = !limited && trailing === 0;
+  const text = readable(result.bytes);
+  const evidence: ReadonlyArray<readonly [boolean, number, string]> = [
+    [fit === "magic", 50, "starts with its magic number"],
+    [fit === "header", 25, "header fields are valid"],
+    [checksum, 30, "checksum matches"],
+    [whole, 10, "decodes to the last byte"],
+    [trailing > 0, -15, `${trailing} bytes follow the stream`],
+    [limited, 0, `output passes the limit of ${limit} bytes, cut there`],
+    [text, 10, "decompresses to readable text"],
+    [result.bytes.length > length, 5, "comes out longer than it went in"],
+  ];
+  const held = evidence.filter(([holds]) => holds);
+  const confidence = held.reduce((sum, [, points]) => sum + points, 0);
+  return {
+    format: probe.format,
+    container: probe.container,
+    confidence: Math.max(1, Math.min(100, confidence)),
+    reasons: held.map(([, , reason]) => reason),
+    bytes: result.bytes,
+    details: result.details,
+    confirmed: confirmed(fit, checksum, whole && text),
+    limited,
+  };
+}
+
+/**
+ * Tries one probe. Raw deflate and brotli need bytes back, to the last byte or to the limit.
  *
  * @param probe - The container.
  * @param fit - How its start fit.
@@ -209,29 +260,8 @@ function attempt(
 ): CompressionCandidate | undefined {
   const result = tryProbe(probe, bytes, limit);
   const trailing = Number(result?.details["trailing"] ?? 0);
-  // Raw deflate and brotli count only when they eat every byte and give some back.
   if (!result || (fit === "none" && (result.bytes.length === 0 || trailing > 0))) return undefined;
-  const text = readable(result.bytes);
-  const evidence: ReadonlyArray<readonly [boolean, number, string]> = [
-    [fit === "magic", 50, "starts with its magic number"],
-    [fit === "header", 25, "header fields are valid"],
-    [probe.checksum, 30, "checksum matches"],
-    [trailing === 0, 10, "decodes to the last byte"],
-    [trailing > 0, -15, `${trailing} bytes follow the stream`],
-    [text, 10, "decompresses to readable text"],
-    [result.bytes.length > bytes.length, 5, "comes out longer than it went in"],
-  ];
-  const held = evidence.filter(([holds]) => holds);
-  const confidence = held.reduce((sum, [, points]) => sum + points, 0);
-  return {
-    format: probe.format,
-    container: probe.container,
-    confidence: Math.max(1, Math.min(100, confidence)),
-    reasons: held.map(([, , reason]) => reason),
-    bytes: result.bytes,
-    details: result.details,
-    confirmed: confirmed(fit, probe.checksum, trailing === 0 && text),
-  };
+  return scored(probe, fit, result, { length: bytes.length, limit, trailing });
 }
 
 /**
@@ -273,7 +303,8 @@ export function archiveOf(data: Uint8Array): string | undefined {
 
 /**
  * Takes off one compression layer at a time while the best candidate is confirmed, and lists
- * every layer, outermost first. An unconfirmed best guess ends the list with `confirmed: false`.
+ * every layer, outermost first. An unconfirmed best guess ends the list with `confirmed: false`,
+ * a layer cut at the limit with `limited: true`.
  *
  * @param data - The bytes.
  * @param options - The output limit per attempt and the most layers.
@@ -287,7 +318,7 @@ export function peel(data: Uint8Array, options?: Readonly<PeelOptions>): Compres
     const [best] = identify(bytes, options);
     if (!best) break;
     layers.push(best);
-    if (!best.confirmed) break;
+    if (!best.confirmed || best.limited) break;
     bytes = best.bytes;
   }
   return layers;

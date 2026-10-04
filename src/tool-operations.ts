@@ -86,6 +86,8 @@ export interface IdentifyCandidate {
   confidence: number;
   reasons: string[];
   confirmed: boolean;
+  /** Whether the output passed the limit, so the bytes stop there. */
+  limited: boolean;
   byteLength: number;
   /** The start of the decompressed bytes: text when readable, else hex. */
   preview: string;
@@ -444,6 +446,7 @@ function candidateOf(candidate: CompressionCandidate): IdentifyCandidate {
     confidence: candidate.confidence,
     reasons: candidate.reasons,
     confirmed: candidate.confirmed,
+    limited: candidate.limited,
     byteLength: candidate.bytes.length,
     preview,
     previewFormat: text ? "utf8" : "hex",
@@ -478,6 +481,21 @@ function nothingFound(length: number, archive: string | undefined, what: string)
 }
 
 /**
+ * Heads the innermost bytes, saying when the limit cut them and how many the base64 holds.
+ *
+ * @param length - How many bytes the layer gave.
+ * @param shown - Most bytes the answer shows.
+ * @param limited - Whether the limit cut it.
+ * @returns {string} The line.
+ */
+function innermostLine(length: number, shown: number, limited: boolean): string {
+  const cut = limited ? ", cut at the limit" : "";
+  return shown < length
+    ? `Innermost, ${length} bytes${cut}. The first ${shown} as base64:`
+    : `Innermost, ${length} bytes as base64${cut}:`;
+}
+
+/**
  * Peels every layer it can confirm, and hands the innermost bytes on.
  *
  * @param data - The bytes.
@@ -494,8 +512,8 @@ function peelLayers(
 ): ToolResult<IdentifyDetails> {
   const peeled = peel(data, { limit: limits.output, depth });
   const layers = peeled.map(candidateOf);
-  const inner = peeled.findLast((layer) => layer.confirmed)?.bytes;
-  const encoded = inner ? base64.encode(inner.subarray(0, limits.shown)) : undefined;
+  const innermost = peeled.findLast((layer) => layer.confirmed);
+  const encoded = innermost ? base64.encode(innermost.bytes.subarray(0, limits.shown)) : undefined;
   const lines =
     layers.length === 0
       ? [nothingFound(data.length, archive, "No compression layer found in")]
@@ -503,7 +521,8 @@ function peelLayers(
           `${layers.length} ${layers.length === 1 ? "layer" : "layers"}, outermost first:`,
           ...layers.map((layer, index) => candidateText(layer, index + 1)),
         ];
-  if (inner && encoded) lines.push(`Innermost, ${inner.length} bytes as base64:`, encoded);
+  if (innermost && encoded)
+    lines.push(innermostLine(innermost.bytes.length, limits.shown, innermost.limited), encoded);
   return {
     content: [{ type: "text", text: lines.join("\n") }],
     details: {
@@ -541,10 +560,13 @@ export function compressionsIdentify(
   const listed = candidates
     .map((candidate, index) => candidateText(candidate, index + 1))
     .join("\n");
+  const cut = candidates.some((candidate) => candidate.limited)
+    ? " For a candidate cut at the limit, set partial to take the bytes under it."
+    : "";
   const text =
     candidates.length === 0
       ? nothingFound(data.length, archive, "No format decompresses these")
-      : `${candidates.length} ${candidates.length === 1 ? "candidate" : "candidates"}, best first:\n${listed}\nNext: compressions_decompress with the format and container, or set peel for nested layers.`;
+      : `${candidates.length} ${candidates.length === 1 ? "candidate" : "candidates"}, best first:\n${listed}\nNext: compressions_decompress with the format and container, or set peel for nested layers.${cut}`;
   return {
     content: [{ type: "text", text }],
     details: { candidates, ...(archive ? { archive } : {}) },
