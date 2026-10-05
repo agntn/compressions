@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { rolldown } from "vite/rolldown";
 import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 import { formatEntries } from "../build.config.ts";
@@ -20,6 +21,16 @@ const markers: Record<(typeof entries)[number], string> = {
   lz4: "not a legacy LZ4 frame",
   lzw: "is not in the table yet",
 };
+
+/** What a format can throw. `UnknownFormatError` belongs to the registry and stays at the root. */
+const errorClasses = [
+  "CompressionError",
+  "DecompressError",
+  "ChecksumError",
+  "UnsupportedError",
+  "LimitError",
+  "InvalidOptionError",
+];
 
 /** Strings of the registry and `identify`, which no format subpath should load. */
 const registryMarkers = ["is a container, not a format", "decodes to the last byte"];
@@ -65,6 +76,12 @@ async function bundle(entry: string): Promise<string> {
   return output.map((chunk) => ("code" in chunk ? chunk.code : "")).join("\n");
 }
 
+/* The exports of one built entry, by file name without extension. */
+async function load(entry: string): Promise<Record<string, unknown>> {
+  const url = pathToFileURL(join(packed, `${entry}.mjs`)).href;
+  return (await import(url)) as Record<string, unknown>;
+}
+
 describe("format subpaths", () => {
   it.each(entries)("%s carries its own format and no other", async (format) => {
     const code = await bundle(format);
@@ -74,6 +91,12 @@ describe("format subpaths", () => {
       expect(code, `${format} pulled in ${other}`).not.toContain(marker);
     }
     for (const marker of registryMarkers) expect(code).not.toContain(marker);
+  });
+
+  it.each(entries)("%s hands out the root's error classes, so instanceof works", async (format) => {
+    const [subpath, root] = await Promise.all([load(format), load("index")]);
+    for (const name of errorClasses) expect(subpath[name], name).toBe(root[name]);
+    expect(subpath).not.toHaveProperty("UnknownFormatError");
   });
 
   it("keeps the brotli dictionary out of every subpath but brotli", async () => {
