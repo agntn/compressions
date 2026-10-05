@@ -1,6 +1,24 @@
 # Changelog
 
 
+## v0.1.1
+
+[compare changes](https://github.com/agntn/compressions/compare/v0.1.0...v0.1.1)
+
+### 🚀 Enhancements
+
+- Let instanceof work from a format subpath ([#20](https://github.com/agntn/compressions/pull/20))
+
+### 🩹 Fixes
+
+- Take a bare /mcp call the way stdio does ([#12](https://github.com/agntn/compressions/pull/12))
+- Stop calling a huge stream no format ([#15](https://github.com/agntn/compressions/pull/15))
+
+### ❤️ Contributors
+
+- Aeitwoen ([@aeitwoen](https://github.com/aeitwoen))
+- Ori ([@oritwoen](https://github.com/oritwoen))
+
 ## v0.1.0
 
 

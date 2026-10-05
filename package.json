@@ -1,6 +1,6 @@
 {
   "name": "@agntn/compressions",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "gzip, zlib, deflate, bzip2, xz, lzma, zstd, brotli, lz4 and Unix compress, written from the specs",
   "keywords": [
     "agent",
