@@ -128,8 +128,17 @@ const containerItems = computed(() =>
 const inputFormatItems = INPUT_FORMATS.map((value) => ({ label: value, value }));
 const dataFormatItems = DATA_FORMATS.map((value) => ({ label: value, value }));
 const outputFormatItems = OUTPUT_FORMATS.map((value) => ({ label: value, value }));
+/** Reka won't take `""` as a menu value, so "every format" goes on the menu as `*`. */
+const EVERY_FORMAT = "*";
+/** The menu's side of `describe`: `*` and anything unknown read back as `""`, no format. */
+const describeModel = computed({
+  get: () => describe.value || EVERY_FORMAT,
+  set: (value: string) => {
+    describe.value = formatEntry(value) ? value : "";
+  },
+});
 const describeItems = [
-  { label: "every format", value: "" },
+  { label: "every format", value: EVERY_FORMAT },
   ...FORMATS.map((format) => ({ label: format.slug, value: format.slug, icon: format.icon })),
 ];
 
@@ -538,7 +547,7 @@ const shareLink = computed(() => {
                 <dd>
                   <USelectMenu
                     id="playground-describe"
-                    v-model="describe"
+                    v-model="describeModel"
                     :items="describeItems"
                     value-key="value"
                     variant="none"
