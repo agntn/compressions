@@ -5,9 +5,9 @@ import {
   toolAnnotations,
 } from "@agntn/tools/mcp";
 import type { CallToolResult, Server, Tool } from "@modelcontextprotocol/server";
+import { serverInfo } from "./server-info.ts";
 import type { ToolLimits } from "./tool-contract.ts";
 import { compressionTools, type CompressionCallContext } from "./tools.ts";
-import { version } from "./version.ts";
 
 /** The `tools/list` entries shared by `compressions mcp` and the MCP server of the docs site. */
 export const toolListings: readonly Tool[] = compressionTools.map((tool) => ({
@@ -67,5 +67,5 @@ export async function callTool(
  * @returns {Server} Unconnected MCP server.
  */
 export function createMcpServer(): Server {
-  return createToolServer({ name: "compressions", version }, compressionTools);
+  return createToolServer(serverInfo, compressionTools);
 }
