@@ -1,9 +1,11 @@
+import { existsSync } from "node:fs";
 import * as zlib from "node:zlib";
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 import { compressionAiTools } from "../src/ai.ts";
 import { XZ_CHECKS, deflate, formatInfos, lzma } from "../src/index.ts";
 import { createMcpServer } from "../src/mcp.ts";
+import { serverInfo } from "../src/server-info.ts";
 import { CHECKS, CONTAINERS, DEFAULT_SHOWN_BYTES } from "../src/tool-contract.ts";
 import { compressionTools } from "../src/tools.ts";
 
@@ -41,6 +43,16 @@ async function call(
 const base64 = (bytes: Uint8Array): string => Buffer.from(bytes).toString("base64");
 
 describe("compressions MCP server", () => {
+  it("introduces itself with a description and icons the site serves", async () => {
+    const client = await connectTestClient();
+
+    expect(client.getServerVersion()).toEqual(serverInfo);
+    for (const icon of serverInfo.icons) {
+      const file = new URL(`../docs/public${new URL(icon.src).pathname}`, import.meta.url);
+      expect(existsSync(file), icon.src).toBe(true);
+    }
+  });
+
   it("advertises every tool as read-only, in one order on every surface", async () => {
     const client = await connectTestClient();
     const { tools } = await client.listTools();
