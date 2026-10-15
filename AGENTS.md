@@ -65,8 +65,8 @@ src/commands/            - compress, decompress, identify, list, mcp
 docs/                    - Docus site for compressions.agntn.dev
 test/                    - tests
 test/fixtures/           - Pi and OMP extension test hosts, frozen streams of other implementations, RFC 8878 tables
-packages/omp/extensions/ - OMP extension sources shipped with the package
-packages/pi/extensions/  - Pi extension sources shipped with the package
+extensions/omp/ - OMP extension sources shipped with the package
+extensions/pi/  - Pi extension sources shipped with the package
 dist/                    - build output (generated)
 ```
 
