@@ -6,9 +6,7 @@ import { describe, expect, it } from "vite-plus/test";
 import { compressionTools } from "../src/tools.ts";
 import { loadPiExtension } from "./fixtures/pi-host.ts";
 
-const extensionPath = fileURLToPath(
-  new URL("../packages/pi/extensions/compressions.ts", import.meta.url),
-);
+const extensionPath = fileURLToPath(new URL("../extensions/pi/compressions.ts", import.meta.url));
 
 describe("pi compressions extension", () => {
   it("registers every tool with the shared schemas", async () => {
