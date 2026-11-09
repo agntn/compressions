@@ -173,8 +173,8 @@ importers:
         specifier: 0.7.2
         version: 0.7.2(ai@7.0.127(zod@4.6.5))(zod@4.6.5)
       '@agntn/tools':
-        specifier: 0.2.4
-        version: 0.2.4(@modelcontextprotocol/server@2.2.0)(ai@7.0.127(zod@4.6.5))(zod@4.6.5)
+        specifier: 0.3.0
+        version: 0.3.0(@modelcontextprotocol/server@2.2.0)(ai@7.0.127(zod@4.6.5))(zod@4.6.5)
       '@modelcontextprotocol/sdk':
         specifier: 1.30.1
         version: 1.30.1(@cfworker/json-schema@4.1.1)(supports-color@10.2.2)(zod@4.6.5)
@@ -249,6 +249,30 @@ packages:
 
   '@agntn/tools@0.2.4':
     resolution: {integrity: sha512-5fRpNr2WFaumfl+S7IkaCgkFXqD6hNRHqZfL90FEJb/yJdD5xoRBYgYXalSw6WNSoeoe7+qaVHgZP9bGsBo/Zw==}
+    engines: {node: '>=26'}
+    peerDependencies:
+      '@earendil-works/pi-coding-agent': '>=0.84.2 <2'
+      '@modelcontextprotocol/server': '>=2.2.0 <3'
+      '@oh-my-pi/pi-coding-agent': '>=18.0.0 <19'
+      ai: '>=7.0.0 <8'
+      h3-mcp: '>=0.2.0 <0.3'
+      zod: '>=4.1.13 <5'
+    peerDependenciesMeta:
+      '@earendil-works/pi-coding-agent':
+        optional: true
+      '@modelcontextprotocol/server':
+        optional: true
+      '@oh-my-pi/pi-coding-agent':
+        optional: true
+      ai:
+        optional: true
+      h3-mcp:
+        optional: true
+      zod:
+        optional: true
+
+  '@agntn/tools@0.3.0':
+    resolution: {integrity: sha512-opDmmURapVZBZ2f4OfbVSY5KpVwEh9cON5bIVpbeLIvn+l+o0sSuIvi2+42Tfrn73NK2Dp4r+m+aP3bk248Zaw==}
     engines: {node: '>=26'}
     peerDependencies:
       '@earendil-works/pi-coding-agent': '>=0.84.2 <2'
@@ -7844,6 +7868,12 @@ snapshots:
       - zod
 
   '@agntn/tools@0.2.4(@modelcontextprotocol/server@2.2.0)(ai@7.0.127(zod@4.6.5))(zod@4.6.5)':
+    optionalDependencies:
+      '@modelcontextprotocol/server': 2.2.0
+      ai: 7.0.127(zod@4.6.5)
+      zod: 4.6.5
+
+  '@agntn/tools@0.3.0(@modelcontextprotocol/server@2.2.0)(ai@7.0.127(zod@4.6.5))(zod@4.6.5)':
     optionalDependencies:
       '@modelcontextprotocol/server': 2.2.0
       ai: 7.0.127(zod@4.6.5)
