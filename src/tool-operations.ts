@@ -434,7 +434,7 @@ export function compressionsDecompress(
  * @param candidate - The candidate.
  * @returns {IdentifyCandidate} Its tool shape.
  */
-function candidateOf(candidate: CompressionCandidate): IdentifyCandidate {
+export function candidateOf(candidate: CompressionCandidate): IdentifyCandidate {
   const head = candidate.bytes.subarray(0, PREVIEW_LENGTH);
   const text = readable(head);
   const preview = text
@@ -496,20 +496,31 @@ function innermostLine(length: number, shown: number, limited: boolean): string 
 }
 
 /**
+ * Lists peeled layers under a heading.
+ *
+ * @param layers - The layers, outermost first.
+ * @returns {string[]} The heading and two lines per layer.
+ */
+export function layerLines(layers: readonly IdentifyCandidate[]): string[] {
+  return [
+    `${layers.length} ${layers.length === 1 ? "layer" : "layers"}, outermost first:`,
+    ...layers.map((layer, index) => candidateText(layer, index + 1)),
+  ];
+}
+
+/**
  * Peels every layer it can confirm, and hands the innermost bytes on.
  *
  * @param data - The bytes.
- * @param depth - Most layers.
- * @param archive - An archive format the bytes start like.
- * @param limits - The limits to enforce.
+ * @param options - Most layers, and the limits to enforce.
  * @returns {ToolResult<IdentifyDetails>} The layers.
  */
-function peelLayers(
+export function peeledAnswer(
   data: Uint8Array,
-  depth: number,
-  archive: string | undefined,
-  limits: ToolLimits,
+  options: Readonly<{ depth: number; limits: ToolLimits }>,
 ): ToolResult<IdentifyDetails> {
+  const { depth, limits } = options;
+  const archive = archiveOf(data);
   const peeled = peel(data, { limit: limits.output, depth });
   const layers = peeled.map(candidateOf);
   const innermost = peeled.findLast((layer) => layer.confirmed);
@@ -517,20 +528,40 @@ function peelLayers(
   const lines =
     layers.length === 0
       ? [nothingFound(data.length, archive, "No compression layer found in")]
-      : [
-          `${layers.length} ${layers.length === 1 ? "layer" : "layers"}, outermost first:`,
-          ...layers.map((layer, index) => candidateText(layer, index + 1)),
-        ];
-  if (innermost && encoded)
+      : layerLines(layers);
+  if (innermost && encoded !== undefined)
     lines.push(innermostLine(innermost.bytes.length, limits.shown, innermost.limited), encoded);
   return {
     content: [{ type: "text", text: lines.join("\n") }],
     details: {
       candidates: [],
       layers,
-      ...(encoded ? { data: encoded } : {}),
+      ...(encoded === undefined ? {} : { data: encoded }),
       ...(archive ? { archive } : {}),
     },
+  };
+}
+
+/**
+ * Ranks the formats some bytes decompress in, or says that nothing fits.
+ *
+ * @param data - The bytes.
+ * @param limit - Most bytes one attempt writes.
+ * @returns {ToolResult<IdentifyDetails>} The candidates, best first.
+ */
+export function rankedAnswer(data: Uint8Array, limit: number): ToolResult<IdentifyDetails> {
+  const archive = archiveOf(data);
+  const candidates = identify(data, { limit }).slice(0, MAX_LAYERS).map(candidateOf);
+  const listed = candidates
+    .map((candidate, index) => candidateText(candidate, index + 1))
+    .join("\n");
+  const text =
+    candidates.length === 0
+      ? nothingFound(data.length, archive, "No format decompresses these")
+      : `${candidates.length} ${candidates.length === 1 ? "candidate" : "candidates"}, best first:\n${listed}`;
+  return {
+    content: [{ type: "text", text }],
+    details: { candidates, ...(archive ? { archive } : {}) },
   };
 }
 
@@ -547,30 +578,18 @@ export function compressionsIdentify(
 ): ToolResult<IdentifyDetails> {
   const dataFormat = enumArgument("dataFormat", params["dataFormat"], DATA_FORMATS, "base64");
   const data = bytesOf("data", stringArgument("data", params["data"], limits.input), dataFormat);
-  const archive = archiveOf(data);
   if (params["peel"] === true) {
-    return peelLayers(
-      data,
-      integerArgument("depth", params["depth"], 1, MAX_LAYERS, MAX_LAYERS),
-      archive,
-      limits,
-    );
+    const depth = integerArgument("depth", params["depth"], 1, MAX_LAYERS, MAX_LAYERS);
+    return peeledAnswer(data, { depth, limits });
   }
-  const candidates = identify(data, { limit: limits.output }).slice(0, MAX_LAYERS).map(candidateOf);
-  const listed = candidates
-    .map((candidate, index) => candidateText(candidate, index + 1))
-    .join("\n");
-  const cut = candidates.some((candidate) => candidate.limited)
+  const { content, details } = rankedAnswer(data, limits.output);
+  if (details.candidates.length === 0) return { content, details };
+  const cut = details.candidates.some((candidate) => candidate.limited)
     ? " For a candidate cut at the limit, set partial to take the bytes under it."
     : "";
-  const text =
-    candidates.length === 0
-      ? nothingFound(data.length, archive, "No format decompresses these")
-      : `${candidates.length} ${candidates.length === 1 ? "candidate" : "candidates"}, best first:\n${listed}\nNext: compressions_decompress with the format and container, or set peel for nested layers.${cut}`;
-  return {
-    content: [{ type: "text", text }],
-    details: { candidates, ...(archive ? { archive } : {}) },
-  };
+  const ranked = content.map((block) => block.text).join("\n");
+  const text = `${ranked}\nNext: compressions_decompress with the format and container, or set peel for nested layers.${cut}`;
+  return { content: [{ type: "text", text }], details };
 }
 
 /**

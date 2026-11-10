@@ -259,6 +259,12 @@ export const infoTool = defineTool({
   guidelines: [CONTAINER_NOTE],
   effect: "read",
   input: infoSchema,
+  cli: {
+    command: "list",
+    description: "List the formats, or show one with its containers and options",
+    positional: ["format"],
+    plain: ["format"],
+  },
   execute: async (params) => (await loadOperations()).compressionsInfo(params),
 });
 

@@ -97,9 +97,7 @@
     "@agntn/encodings": "0.2.0",
     "@agntn/hashes": "0.7.2",
     "@agntn/tools": "0.3.0",
-    "@modelcontextprotocol/server": "2.2.0",
-    "citty": "0.2.2",
-    "consola": "3.4.2"
+    "@modelcontextprotocol/server": "2.2.0"
   },
   "devDependencies": {
     "@agntn/ox": "0.1.0",

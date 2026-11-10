@@ -43,13 +43,17 @@ npx @agntn/compressions identify mystery.bin --peel
 ```
 
 ```
- 90 bzip2 --container bzip2  starts with its magic number; checksum matches; decodes to the last byte  124 bytes
- 90 lzma --container xz  starts with its magic number; checksum matches; decodes to the last byte  65 bytes
-100 deflate --container gzip  starts with its magic number; checksum matches; decodes to the last byte; decompresses to readable text  "meet me at the old lighthouse at midnight\n"
+3 layers, outermost first:
+1. bzip2 container bzip2, confidence 90: starts with its magic number; checksum matches; decodes to the last byte (level 9, blocks 1)
+   112 bytes, hex fd377a585a000004e6d6b446…
+2. lzma container xz, confidence 90: starts with its magic number; checksum matches; decodes to the last byte (check "crc64", blocks 1)
+   56 bytes, hex 1f8b08000000000000ffcb4d…
+3. deflate container gzip, confidence 100: starts with its magic number; checksum matches; decodes to the last byte; decompresses to readable text (os 255, members 1)
+   42 bytes, text "meet me at the old lighthouse at midnight\n"
 meet me at the old lighthouse at midnight
 ```
 
-Three layers, outermost first, on stderr. The note itself goes to stdout. From here on it's just `compressions`. That's `pnpm exec compressions` in a project, or install it globally with `pnpm add -g @agntn/compressions`.
+Three layers land on stderr, outermost first. The note itself goes to stdout. From here on it's just `compressions`. That's `pnpm exec compressions` in a project, or install it globally with `pnpm add -g @agntn/compressions`.
 
 What if somebody flipped a bit?
 
@@ -73,7 +77,7 @@ Exit code 1. Want the bytes anyway? Add `--partial`. No key, no config, no netwo
 | `compressions list [format]`              | All of them, or one with its containers and options |
 | `compressions mcp`                        | MCP server over stdio                               |
 
-`-` reads stdin. `--from hex` and `--to base64` for when bytes travel as text. Compressed bytes never go to a terminal raw. Every flag for every format is in the [CLI guide](https://compressions.agntn.dev/guide/cli).
+`-` reads stdin. `--from hex` and `--to base64` for when bytes travel as text. Compressed bytes never go to a terminal raw. A script reading the output? `identify` and `list` take `--json`. Every flag for every format is in the [CLI guide](https://compressions.agntn.dev/guide/cli).
 
 ## 🧠 Library
 
