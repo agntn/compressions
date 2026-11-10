@@ -26,7 +26,8 @@ Keep AGENTS.md updated with project status.
 - A failed Publish run is recovered with `gh workflow run publish.yml --ref main -f tag=vX.Y.Z`, not a rerun, as in the sibling packages. `test/release.test.ts` pins that ref.
 - Each tool is declared once in `src/tools.ts` with `defineTool` from `@agntn/tools`, and the MCP server, both extensions and `src/ai.ts` take that list through its adapters. `toolListings` and `callTool()` in `src/mcp.ts` also run the remote server at `compressions.agntn.dev/mcp`, where a new tool needs a file in `docs/server/mcp/tools/` (see `docs/AGENTS.md`). Both servers introduce themselves with `serverInfo` from `src/server-info.ts`: name, version, a one-line pitch and the site's icons, so a connector card shows more than a name (#25). That takes `@agntn/tools` 0.2.1, since 0.0.0 dropped `description` and `icons`. Schemas take `Type` from `@agntn/tools`, never from `typebox`.
 - A tool executor throws when it can't answer. The MCP adapter turns the throw into a sanitized `isError` result.
-- A local MCP server needs a restart, not `pnpm build`: inside a checkout `dist/cli.mjs` loads the `mcp` command from `src/` (see Conventions).
+- The CLI is `runCli` from `@agntn/tools/cli` over the same tool list. `list` is the `info` tool. `compress`, `decompress` and `identify` are package commands in `src/cli-commands.ts`: they read a file or stdin byte for byte and write raw bytes. Their option flags come from the tool schema. `identify` prints the tool's text without the hint about the next call.
+- A local MCP server needs a restart, not `pnpm build`: inside a checkout `dist/cli.mjs` serves `src/mcp.ts` (see Conventions).
 - The CLI never writes raw compressed bytes to a terminal. Decompressed bytes go to stdout, what the stream says about itself to stderr.
 - `pnpm release` and the Publish workflow build before `pnpm test`, as CI does.
 - Linting and formatting consume the shared `@agntn/ox` policy. The allow list of `prefer-readonly-parameter-types` in `vite.config.ts` names the classes that are mutated by design (readers, writers, `Output`, the coders).
@@ -61,7 +62,7 @@ Keep AGENTS.md updated with project status.
 src/core/                - codecs, registry, identify, errors, types, Output
 src/<format>.ts          - one subpath per format: deflate, bzip2, lzma, zstd, brotli, lz4, lzw
 src/tools.ts             - the tool definitions; tool-operations.ts runs them, tool-contract.ts holds the limits
-src/commands/            - compress, decompress, identify, list, mcp
+src/cli-commands.ts      - the commands only the CLI gets; cli-operations.ts runs them
 docs/                    - Docus site for compressions.agntn.dev
 test/                    - tests
 test/fixtures/           - Pi and OMP extension test hosts, frozen streams of other implementations, RFC 8878 tables
@@ -76,6 +77,6 @@ dist/                    - build output (generated)
 - Exports use `.d.mts` / `.mjs` extensions
 - Strict TypeScript (all strict checks enabled)
 - No `as any`, `@ts-ignore`, or `@ts-expect-error`
-- Nothing under `src/` outside `src/cli.ts` and `src/commands/` imports `node:*`
-- Local MCP from source: `src/cli.ts` imports the `mcp` command from a runtime URL of `src/commands/mcp.ts` when the bin is built, `COMPRESSIONS_DIST` is not `1`, the path has no `node_modules` segment and the file exists. Otherwise it takes the bundled command. Relative imports end in `.ts` and `erasableSyntaxOnly` holds, or plain Node cannot run `src/`.
+- Nothing under `src/` outside `src/cli.ts` and `src/cli-operations.ts` imports `node:*`
+- Local MCP from source: `src/cli.ts` serves `createMcpServer` from a runtime URL of `src/mcp.ts` when the bin is built, `COMPRESSIONS_DIST` is not `1`, the path has no `node_modules` segment and the file exists. Otherwise `runCli` serves the bundled tools. Relative imports end in `.ts` and `erasableSyntaxOnly` holds, or plain Node cannot run `src/`.
 - Pull requests and issues use short, freeform descriptions focused on why a change is needed or what went wrong.

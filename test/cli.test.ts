@@ -49,15 +49,19 @@ function run(...args: readonly string[]) {
 const TEXT = "Compress me from the command line. ".repeat(30);
 
 describe("compressions CLI", () => {
-  it("prints the usage and citty's errors without colors into a pipe", () => {
+  it("prints the usage and its errors without colors into a pipe", () => {
     const help = run("--help");
     const usage = run("compress", "--help");
     const unknown = run("nope");
-    expect(help.stdout.toString()).toContain(
-      "USAGE compressions compress|decompress|identify|list|mcp",
+    for (const name of ["compress", "decompress", "identify", "list", "mcp"])
+      expect(help.stdout.toString()).toMatch(new RegExp(`^  ${name} `, "mu"));
+    expect(usage.stdout.toString()).toContain(
+      "USAGE compressions compress [OPTIONS] <FORMAT> <FILE>",
     );
-    expect(usage.stdout.toString()).toContain("FORMAT");
-    expect(unknown).toMatchObject({ code: 1, stderr: "Unknown command nope\n" });
+    expect(unknown).toMatchObject({
+      code: 1,
+      stderr: 'Unknown command "nope"\nRun compressions --help for the commands\n',
+    });
     for (const output of [help, usage, unknown])
       expect(output.stdout.toString() + output.stderr).not.toContain("\u001B");
   });
@@ -103,26 +107,64 @@ describe("compressions CLI", () => {
     const inner = runWith(TEXT, "compress", "deflate", "-", "--container", "gzip").stdout;
     const outer = runWith(inner, "compress", "bzip2", "-").stdout;
     const ranked = runWith(outer, "identify", "-");
-    expect(ranked.stdout.toString().split("\n")[0]).toMatch(
-      /^ 90 bzip2 --container bzip2 {2}starts with its magic number/u,
-    );
-    const peeled = runWith(outer, "identify", "--peel", "-");
-    expect(peeled.stdout.toString()).toBe(TEXT);
-    expect(peeled.stderr.split("\n").slice(0, 2)).toEqual([
-      expect.stringMatching(/bzip2 --container bzip2/u),
-      expect.stringMatching(/deflate --container gzip/u),
+    expect(ranked.stdout.toString().split("\n").slice(0, 2)).toEqual([
+      "1 candidate, best first:",
+      expect.stringMatching(
+        /^1\. bzip2 container bzip2, confidence 90: starts with its magic number/u,
+      ),
     ]);
+    const peeled = runWith(outer, "identify", "--peel", "-");
+    expect(peeled.code).toBe(0);
+    expect(peeled.stdout.toString()).toBe(TEXT);
+    const listed = peeled.stderr.split("\n");
+    expect(listed[0]).toBe("2 layers, outermost first:");
+    expect(listed[1]).toMatch(/^1\. bzip2 container bzip2/u);
+    expect(listed[3]).toMatch(/^2\. deflate container gzip/u);
     const plain = runWith(TEXT, "identify", "-");
-    expect(plain).toMatchObject({ code: 1, stderr: "No format decompresses this.\n" });
+    expect(plain).toMatchObject({
+      code: 1,
+      stderr: `No format decompresses these ${TEXT.length} bytes.\n`,
+    });
+    expect(plain.stdout).toHaveLength(0);
+    expect(runWith(TEXT, "identify", "--peel", "-")).toMatchObject({
+      code: 1,
+      stderr: "No confirmed layer.\n",
+    });
+  });
+
+  it("hands the candidates and the peeled layers over as JSON", () => {
+    const inner = runWith(TEXT, "compress", "deflate", "-", "--container", "gzip").stdout;
+    const outer = runWith(inner, "compress", "lzma", "-", "--container", "xz").stdout;
+    const ranked: unknown = JSON.parse(runWith(outer, "identify", "-", "--json").stdout.toString());
+    expect(ranked).toMatchObject({
+      candidates: [{ format: "lzma", container: "xz", confidence: 90, confirmed: true }],
+    });
+    const peeled: unknown = JSON.parse(
+      runWith(outer, "identify", "-", "--peel", "--json").stdout.toString(),
+    );
+    expect(peeled).toMatchObject({
+      candidates: [],
+      layers: [{ container: "xz" }, { container: "gzip" }],
+      data: Buffer.from(TEXT).toString("base64"),
+    });
   });
 
   it("lists the formats and shows one", () => {
-    expect(run("list").stdout.toString().trim().split("\n")).toHaveLength(7);
+    const names = ["deflate", "bzip2", "lzma", "zstd", "brotli", "lz4", "lzw"];
+    const heads = run("list")
+      .stdout.toString()
+      .split("\n")
+      .filter((line) => /^\w/u.test(line));
+    expect(heads.map((line) => line.split(":")[0])).toEqual(names);
     const lzma = run("list", "lzma").stdout.toString();
-    expect(lzma).toContain("container xz       xz, .xz .txz, magic fd377a585a00");
     expect(lzma).toContain(
-      "--check      What xz stores after the block to check it (none, crc32, crc64, sha256) [xz]",
+      "  container xz: xz, The .xz File Format 1.2.1, .xz .txz, magic fd377a585a00",
     );
+    expect(lzma).toContain(
+      "  option check (none, crc32, crc64, sha256): What xz stores after the block to check it, default crc64, xz only",
+    );
+    const listed: unknown = JSON.parse(run("list", "lzw", "--json").stdout.toString());
+    expect(listed).toMatchObject({ formats: [{ name: "lzw", compress: true }] });
   });
 
   it("turns library errors into one line on stderr and exit code 1", () => {
@@ -136,7 +178,11 @@ describe("compressions CLI", () => {
     });
     expect(runWith("x", "compress", "deflate", "-", "--level", "high")).toMatchObject({
       code: 1,
-      stderr: "Invalid option level=high: must be an integer\n",
+      stderr: "Invalid arguments at --level: must be integer\n",
+    });
+    expect(runWith("zz", "decompress", "deflate", "-", "--from", "hex")).toMatchObject({
+      code: 1,
+      stderr: 'Cannot read stdin as hex: hex: "z" (U+007A) at index 0 is not a hex digit\n',
     });
     expect(runWith("x", "compress", "zstd", "-")).toMatchObject({
       code: 1,
@@ -161,13 +207,22 @@ describe("compressions CLI", () => {
     expect(TEXT.startsWith(partial.stdout.toString())).toBe(true);
   });
 
-  it("stops at a file name that starts with a dash and points at --", () => {
-    const hint = "A file name that starts with - goes after --, which ends the options.";
+  it("takes a dashed word for a mistyped option, and for a file name after --", () => {
+    const takes = "takes --container, --limit, --partial, --from, --to (-o)";
     expect(run("decompress", "deflate", "-x.gz")).toMatchObject({
       code: 1,
-      stderr: `Unknown option -x.gz for decompress. ${hint}\n`,
+      stderr: `Invalid arguments: unknown option "-x.gz"; ${takes}\n`,
+    });
+    expect(run("decompress", "deflate", "--limt", "9", "x.gz")).toMatchObject({
+      code: 1,
+      stderr: `Invalid arguments: unknown option "--limt"; ${takes}\n`,
     });
     expect(run("decompress", "deflate", "--", "-x.gz").stderr).toMatch(/^Cannot read -x\.gz/u);
+  });
+
+  it("keeps --json off the commands that write bytes", () => {
+    expect(runWith("x", "compress", "deflate", "-", "--json")).toMatchObject({ code: 1 });
+    expect(runWith("x", "compress", "deflate", "-", "--json").stdout).toHaveLength(0);
   });
 
   it("writes details from the stream escaped, so they cannot drive the terminal", () => {
@@ -244,10 +299,10 @@ function serve(base: string, extraEnv: Readonly<Record<string, string>> = {}) {
   const { status, stderr, stdout } = child;
   const urls = Array.isArray(loaded) ? loaded.filter((url) => typeof url === "string") : [];
   const source = urls.includes(pathToFileURL(join(base, "src/mcp.ts")).href);
-  const bundle = urls.includes(pathToFileURL(join(base, "dist/_chunks/mcp.mjs")).href);
+  const bundle = urls.some((url) => url.endsWith("/@agntn/tools/dist/mcp.mjs"));
   let from: "bundle" | "source" | "unknown" = "unknown";
-  if (source && !bundle) from = "source";
-  if (bundle && !source) from = "bundle";
+  if (source) from = "source";
+  else if (bundle) from = "bundle";
   const name = /"serverInfo":\{"name":"([^"]+)"/.exec(stdout)?.[1];
   return { code: status, from, name, stderr };
 }
