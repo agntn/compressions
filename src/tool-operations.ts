@@ -529,14 +529,14 @@ export function peeledAnswer(
     layers.length === 0
       ? [nothingFound(data.length, archive, "No compression layer found in")]
       : layerLines(layers);
-  if (innermost && encoded)
+  if (innermost && encoded !== undefined)
     lines.push(innermostLine(innermost.bytes.length, limits.shown, innermost.limited), encoded);
   return {
     content: [{ type: "text", text: lines.join("\n") }],
     details: {
       candidates: [],
       layers,
-      ...(encoded ? { data: encoded } : {}),
+      ...(encoded === undefined ? {} : { data: encoded }),
       ...(archive ? { archive } : {}),
     },
   };

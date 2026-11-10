@@ -149,6 +149,13 @@ describe("compressions CLI", () => {
     });
   });
 
+  it("peels an empty gzip into empty bytes, not a failure", () => {
+    const empty = runWith("", "compress", "deflate", "-", "--container", "gzip").stdout;
+    const peeled = runWith(empty, "identify", "-", "--peel", "--json");
+    expect(peeled.code).toBe(0);
+    expect(JSON.parse(peeled.stdout.toString())).toMatchObject({ data: "" });
+  });
+
   it("lists the formats and shows one", () => {
     const names = ["deflate", "bzip2", "lzma", "zstd", "brotli", "lz4", "lzw"];
     const heads = run("list")
