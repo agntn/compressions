@@ -143,6 +143,26 @@ function peelTo(data: Uint8Array, depth: number): ToolResult<null> {
 }
 
 /**
+ * Peels every layer into JSON. A missing or cut innermost layer fails, as it does without `--json`.
+ *
+ * @param data - The bytes.
+ * @param options - Most layers, and most bytes one layer writes.
+ * @returns {ToolResult<IdentifyDetails | null>} The layers and the innermost bytes, or the failure.
+ */
+export function peelJson(
+  data: Uint8Array,
+  options: Readonly<{ depth: number; limit: number }>,
+): ToolResult<IdentifyDetails | null> {
+  const limits = { ...TOOL_LIMITS, output: options.limit, shown: options.limit };
+  const answer = peeledAnswer(data, { depth: options.depth, limits });
+  const inner = answer.details.layers?.findLast((layer) => layer.confirmed);
+  if (!inner) return { ...answer, isError: true };
+  return inner.limited
+    ? failed(`Cut at the limit: that was only the first ${inner.byteLength} bytes.`)
+    : answer;
+}
+
+/**
  * Answers like `compressions_identify`, without its caps. Finding nothing is exit code 1.
  *
  * @param params - The parsed command line.
@@ -157,10 +177,7 @@ export function identify(
   const depth = params.depth ?? 10;
   if (params.peel === true) {
     const json = (host as CliHost | undefined)?.json === true;
-    if (!json) return peelTo(data, depth);
-    const limits = { ...TOOL_LIMITS, output: DEFAULT_LIMIT, shown: DEFAULT_LIMIT };
-    const answer = peeledAnswer(data, { depth, limits });
-    return answer.details.data === undefined ? { ...answer, isError: true } : answer;
+    return json ? peelJson(data, { depth, limit: DEFAULT_LIMIT }) : peelTo(data, depth);
   }
   const answer = rankedAnswer(data, DEFAULT_LIMIT);
   return answer.details.candidates.length === 0 ? { ...answer, isError: true } : answer;

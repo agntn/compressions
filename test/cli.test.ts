@@ -156,6 +156,16 @@ describe("compressions CLI", () => {
     expect(JSON.parse(peeled.stdout.toString())).toMatchObject({ data: "" });
   });
 
+  it("fails a JSON peel whose innermost layer the limit cut", async () => {
+    const { peelJson } = await import("../src/cli-operations.ts");
+    const gz = new Uint8Array(zlib.gzipSync(TEXT));
+    expect(peelJson(gz, { depth: 10, limit: 100 })).toMatchObject({
+      isError: true,
+      content: [{ text: "Cut at the limit: that was only the first 100 bytes." }],
+    });
+    expect(peelJson(gz, { depth: 10, limit: TEXT.length })).not.toHaveProperty("isError");
+  });
+
   it("lists the formats and shows one", () => {
     const names = ["deflate", "bzip2", "lzma", "zstd", "brotli", "lz4", "lzw"];
     const heads = run("list")
