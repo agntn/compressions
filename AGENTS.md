@@ -38,7 +38,7 @@ Keep AGENTS.md updated with project status.
 - **Runtime**: Node.js >= 26
 - **Language**: TypeScript (strict)
 - **Toolchain**: Vite+ (`vp`), one `vite.config.ts` for test, lint and fmt
-- **Build**: obuild from `build.config.ts`, one bundle for every entry and format subpath, chunks under `dist/_chunks/`
+- **Build**: obuild from `build.config.ts`, one bundle for every entry and format subpath, chunks under `dist/_chunks/`, no source maps (#28: obuild strips comments without fixing the maps)
 - **Test**: `vp test` (bundled Vitest, API from `vite-plus/test`)
 - **Lint**: `vp lint` + `vp fmt` (Oxlint + Oxfmt) through `@agntn/ox`
 - **Typecheck**: tsc (native TypeScript 7)

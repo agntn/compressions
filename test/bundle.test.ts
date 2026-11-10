@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { globSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { rolldown } from "vite/rolldown";
@@ -48,7 +48,7 @@ beforeAll(() => {
     await build({
       ...config,
       cwd: ${JSON.stringify(root)},
-      entries: config.entries.map((entry) => ({ ...entry, outDir, dts: false })),
+      entries: config.entries.map((entry) => ({ ...entry, outDir })),
     });
   `;
   const { status, stderr } = spawnSync(process.execPath, ["--input-type=module", "-e", script], {
@@ -110,5 +110,16 @@ describe("format subpaths", () => {
     const code = await bundle("index");
     for (const marker of [...Object.values(markers), ...registryMarkers])
       expect(code).toContain(marker);
+  });
+});
+
+describe("source maps", () => {
+  /** obuild strips comments without updating the map, so a shipped one sends a trace to a `}`. */
+  it("ships none, and no file points at one", () => {
+    const pointers = globSync("**/*.{mjs,d.mts}", { cwd: packed }).filter((file) =>
+      readFileSync(join(packed, file), "utf8").includes("sourceMappingURL"),
+    );
+
+    expect([...globSync("**/*.map", { cwd: packed }), ...pointers]).toEqual([]);
   });
 });
