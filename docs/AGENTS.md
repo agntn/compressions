@@ -7,7 +7,7 @@ Docus site for `@agntn/compressions` at compressions.agntn.dev. Markdown lives i
 ```
 docs/
 ├── DESIGN.md                      # the instruments this site owns and where it departs from the agntn design system
-├── nuxt.config.ts                 # extends: ['docus'], cloudflare_module preset (Workers), @agntn/compressions, its /mcp and #tool-operations aliased to ../src
+├── nuxt.config.ts                 # extends: ['docus'], cloudflare_module preset (Workers), @agntn/compressions and #tool-operations aliased to ../src
 ├── shiki-theme.ts                 # code block theme, every colour a --shiki-token-* variable from app.css
 ├── app/app.config.ts              # title, github, theme, the Nuxt UI variants in the instrument grammar
 ├── app/app.css                    # theme tokens, the shared `console-*` and `hero-*` grammar, `compressions-*` classes
@@ -19,9 +19,7 @@ docs/
 ├── app/utils/                     # formats table (icons, blurbs, groups, containers, sample streams, anatomy, ratio over the library's info()), tools (the agent tools' text), tokens, roster, formatting
 ├── app/pages/playground.vue       # playground, own route outside the docs layout, its own useSeo and OG image
 ├── server/api/__sitemap__/pages.ts # the Vue pages the Docus sitemap cannot see, for `sitemap.sources`
-├── server/mcp/index.ts            # the Docus MCP handler at /mcp, introduced like `compressions mcp` by `src/server-info.ts`
-├── server/mcp/tools/              # one file per tool, each `compressionsMcpTool("<name>")`
-├── server/utils/compressions-mcp.ts # a tool from `@agntn/compressions/mcp` with the worker's limits
+├── server/mcp/index.ts            # the Docus MCP handler at /mcp: the tools of `src/mcp.ts` at the worker's limits, introduced by `src/server-info.ts`
 ├── public/                        # fonts, favicon.svg and the icons and manifest cut from it
 ├── content/index.md               # landing
 ├── content/1.guide/               # getting started, compressing, containers, checksums, identify, limits, CLI, agents, custom, playground
@@ -49,11 +47,9 @@ Versions live in the `deps` and `dev` catalogs of the root `pnpm-workspace.yaml`
 
 ## MCP
 
-`@agntn/compressions/mcp` is a third alias, for `../src/mcp.ts`. A file in `server/mcp/tools/` names one tool and nothing else: `compressionsMcpTool()` takes the name, prose, schema and annotations from `toolListings` and runs `callTool()` from there, so a tool changed in `src/` changes here without an edit. A new tool in `src/tools.ts` needs one more file here, and `test/docs-mcp.test.ts` fails until it has one.
+`server/mcp/index.ts` imports `../src/mcp.ts` by relative path, like `src/server-info.ts`, and hands `toToolkitTools` from `@agntn/tools/toolkit` the tools through `limitedTools(WORKER_LIMITS)`. `tools` is a function that puts them after `getMcpTools({ event })`. An array would replace the toolkit's pool and quietly drop `list-pages` and `get-page`. A tool added to `src/tools.ts` shows up here without an edit. The adapter carries the Zod trick SDK v1 needs, so `tools/list` shows the wire schema, a call without `arguments` reads as `{}`, and a bad argument gets the words of `compressions mcp`, not Zod's. `test/docs-mcp.test.ts` loads the handler with the toolkit's entry mocked and calls the tools through the SDK copy in `docs/node_modules`, holding every answer to stdio's.
 
-`@nuxtjs/mcp-toolkit` wants Zod and validates with it before the handler runs. A Zod error echoes the client's keys as they came and reads differently from `compressions mcp`. So the Zod schema is `z.looseObject({})`, which passes any object, and its `_zod.toJSONSchema` hook returns the wire schema from `toolListings`, so `tools/list` still shows the real one. `callTool` then checks the arguments the way stdio does. A call with no `arguments` at all reaches Zod as `undefined`, so the schema's `run` reads it as `{}` first, the way stdio does. `test/docs-mcp.test.ts` calls the tools through the SDK copy in `docs/node_modules` with Zod and the toolkit from there, which is why `docs/package.json` lists `@nuxtjs/mcp-toolkit` too.
-
-`WORKER_LIMITS` in `server/utils/compressions-mcp.ts` holds a call to 262,144 input characters, 4 MiB of output and 256 KiB shown. An isolate gets 128 MB. Under Node at the contract's 64 MiB, a gzip bomb took 135 MB on top of the baseline, `identify` 200 MB and a two layer `peel` 305 MB, and 2.9 MB of random bytes compressed to base64 ran out of a 128 MB V8 heap: `radix2` in `@agntn/encodings` builds its string one character at a time. At the worker's limits a ten layer `peel` of 4 MiB layers holds 40 MB of buffers and the heap stays under 48 MB. Raise a limit only after the same measurement. The tool descriptions keep saying 64 MiB; the error names the limit that hit.
+`WORKER_LIMITS` in `server/mcp/index.ts` holds a call to 262,144 input characters, 4 MiB of output and 256 KiB shown. An isolate gets 128 MB. Under Node at the contract's 64 MiB, a gzip bomb took 135 MB on top of the baseline, `identify` 200 MB and a two layer `peel` 305 MB, and 2.9 MB of random bytes compressed to base64 ran out of a 128 MB V8 heap: `radix2` in `@agntn/encodings` builds its string one character at a time. At the worker's limits a ten layer `peel` of 4 MiB layers holds 40 MB of buffers and the heap stays under 48 MB. Raise a limit only after the same measurement. The tool descriptions keep saying 64 MiB; the error names the limit that hit.
 
 `src/mcp.ts` imports `@agntn/tools` and `@modelcontextprotocol/server`. Both are dependencies here, from the same catalog as the root's, and listed in `vite.resolve.dedupe`. They run on the worker only, so they stay out of `optimizeDeps`. On the `cloudflare_module` preset the toolkit hands its server to `createLegacyMcpHandler` from `agents`. The `deps` catalog pins `@modelcontextprotocol/sdk` to the version the toolkit asks for, so the toolkit, `agents` and the tests share one copy. After a toolkit bump, check that `.output/server` still holds one `class McpServer`.
 

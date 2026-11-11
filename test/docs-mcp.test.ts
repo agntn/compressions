@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from "node:fs";
+import type { ToolkitTool } from "@agntn/tools/toolkit";
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
 import { Client as SiteClient } from "../docs/node_modules/@modelcontextprotocol/sdk/dist/esm/client/index.js";
 import { InMemoryTransport as SiteTransport } from "../docs/node_modules/@modelcontextprotocol/sdk/dist/esm/inMemory.js";
@@ -8,15 +8,14 @@ import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { deflate } from "../src/index.ts";
 import { callTool, createMcpServer, toolListings } from "../src/mcp.ts";
 
-/* The toolkit's entry pulls in Nitro, and `defineMcpTool` only hands its input back. */
+/* The toolkit's entry pulls in Nitro, so the handler gets its options back and two page tools. */
 vi.mock(
   "../docs/node_modules/@nuxtjs/mcp-toolkit/dist/runtime/server/mcp/definitions/index.js",
   () => ({
-    defineMcpTool: (definition: unknown) => definition,
+    defineMcpHandler: (options: unknown) => options,
+    getMcpTools: async () => [{ name: "list-pages" }, { name: "get-page" }],
   }),
 );
-
-const toolsDir = new URL("../docs/server/mcp/tools/", import.meta.url);
 
 const openConnections: Array<{ close(): Promise<void> }> = [];
 
@@ -24,16 +23,21 @@ afterEach(async () => {
   await Promise.all(openConnections.splice(0).map((connection) => connection.close()));
 });
 
-/* An SDK client on every docs tool, through the same SDK copy the worker runs. */
+/* What `server/mcp/index.ts` serves for one request, Docus page tools included. */
+async function docsTools(): Promise<ReadonlyArray<Readonly<ToolkitTool>>> {
+  const { default: handler } = await import("../docs/server/mcp/index.ts");
+  const { tools } = handler;
+  if (typeof tools !== "function") throw new TypeError("the handler should resolve its tools");
+  return (await tools(undefined as never)) as ToolkitTool[];
+}
+
+/* An SDK client on every compression tool of the docs, through the SDK copy the worker runs. */
 async function siteClient(): Promise<SiteClient> {
-  const { compressionsMcpTool } = await import("../docs/server/utils/compressions-mcp.ts");
   const server = new McpServer({ name: "compressions-docs", version: "0.0.0" });
-  for (const listing of toolListings) {
-    const tool = compressionsMcpTool(listing.name);
-    const handler = tool.handler as (
-      args: Readonly<Record<string, unknown>>,
-    ) => Promise<CallToolResult>;
-    server.registerTool(listing.name, tool, handler);
+  for (const tool of await docsTools()) {
+    if (!tool.name.startsWith("compressions_")) continue;
+    const handler = tool.handler as (args: unknown) => Promise<CallToolResult>;
+    server.registerTool(tool.name, tool as never, handler);
   }
   const [clientTransport, serverTransport] = SiteTransport.createLinkedPair();
   const client = new SiteClient({ name: "compressions-docs-test", version: "0.0.0" });
@@ -62,17 +66,21 @@ const CALLS: ReadonlyArray<[string, Record<string, unknown>]> = [
 const SMALL = { input: 64, output: 1024, shown: 8 };
 
 describe("docs MCP tools", () => {
-  it("serves every tool `compressions mcp` lists, one file each", () => {
-    const files = readdirSync(toolsDir).toSorted();
-    expect(files).toEqual(
-      toolListings.map((tool) => `${tool.name.replaceAll("_", "-")}.ts`).toSorted(),
+  it("serves every tool `compressions mcp` lists after the Docus page tools", async () => {
+    expect((await docsTools()).map((tool) => tool.name)).toEqual([
+      "list-pages",
+      "get-page",
+      ...toolListings.map((tool) => tool.name),
+    ]);
+    const listed = (await (await siteClient()).listTools()).tools;
+    /* SDK v1 adds `$schema` to every listed schema; the rest is the listing as written. */
+    const schemas = listed.map(({ name, inputSchema }) => ({
+      name,
+      schema: { ...inputSchema, $schema: undefined },
+    }));
+    expect(schemas).toEqual(
+      toolListings.map(({ name, inputSchema }) => ({ name, schema: inputSchema })),
     );
-    for (const file of files) {
-      const name = file.slice(0, -".ts".length).replaceAll("-", "_");
-      expect(readFileSync(new URL(file, toolsDir), "utf8")).toBe(
-        `export default compressionsMcpTool(${JSON.stringify(name)});\n`,
-      );
-    }
   });
 
   it("lists and answers exactly as the stdio server does", async () => {
@@ -81,13 +89,39 @@ describe("docs MCP tools", () => {
     const client = new Client({ name: "compressions-docs-test", version: "1.0.0" });
     openConnections.push(client, server);
     await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+    const site = await siteClient();
 
     const { tools } = await client.listTools();
     expect(toolListings).toEqual(tools);
     for (const [name, args] of CALLS) {
       const viaServer = await client.callTool({ name, arguments: args });
       expect(await callTool(name, args), name).toEqual(viaServer);
+      if (name === "compressions_nope") continue;
+      expect(await site.callTool({ name, arguments: args }), name).toEqual(viaServer);
     }
+  });
+
+  it("answers a bad key in the library's sanitized words, not Zod's", async () => {
+    const site = await siteClient();
+    const args = { format: "deflate", input: "x", "a\u202Eb": 1 };
+    const served = await site.callTool({ name: "compressions_compress", arguments: args });
+    expect(served.isError).toBe(true);
+    expect(served.content).toEqual((await callTool("compressions_compress", args)).content);
+    expect(JSON.stringify(served.content)).not.toContain("\u202E");
+  });
+
+  it("holds a call to the worker's limits, not the tool contract's", async () => {
+    const site = await siteClient();
+    const args = { format: "deflate", input: "x".repeat(262_145) };
+    const served = await site.callTool({ name: "compressions_compress", arguments: args });
+    expect(served.isError).toBe(true);
+    expect(served.content).toEqual([
+      {
+        type: "text",
+        text: "compressions_compress failed: Invalid option input=262145 characters: must be 0 to 262144 characters",
+      },
+    ]);
+    expect((await callTool("compressions_compress", args)).isError).toBeFalsy();
   });
 
   it("reads a call without arguments as `{}`, like `compressions mcp`", async () => {

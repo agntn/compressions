@@ -7,8 +7,6 @@ const librarySource = resolve(import.meta.dirname, "../src");
 export default defineNuxtConfig({
   extends: ["docus"],
   alias: {
-    /** The tool listings and the executor `compressions mcp` serves, for the MCP server at /mcp. */
-    "@agntn/compressions/mcp": resolve(librarySource, "mcp.ts"),
     "@agntn/compressions": resolve(librarySource, "index.ts"),
     /** The text the agent tools answer with; it imports nothing beyond the library. */
     "#tool-operations": resolve(librarySource, "tool-operations.ts"),
