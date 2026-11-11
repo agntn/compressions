@@ -56,6 +56,7 @@ catalogs:
     "@agntn/encodings": 0.2.0
     "@agntn/hashes": 0.7.2
     "@agntn/tools": 0.3.0
+    # What @nuxtjs/mcp-toolkit asks for, so the toolkit, agents and the tests share one SDK.
     "@modelcontextprotocol/sdk": 1.32.0
     "@modelcontextprotocol/server": 2.2.0
     "@nuxtjs/mcp-toolkit": 0.23.0
