@@ -41,6 +41,14 @@ export default defineNuxtConfig({
     url: "https://compressions.agntn.dev",
     name: "@agntn/compressions",
   },
+  /** The playground has no markdown twin, so agents get the page itself, not a `/raw` 404. */
+  agentDiscovery: {
+    excludePrefixes: { extend: ["/playground"] },
+  },
+  /** Docus lists `content/` only and leaves app routes out, so the Vue pages come from here. */
+  sitemap: {
+    sources: ["/api/__sitemap__/pages"],
+  },
   llms: {
     domain: "https://compressions.agntn.dev",
     title: "@agntn/compressions",
@@ -69,6 +77,17 @@ export default defineNuxtConfig({
             description: "The library running in the page: compressions_compress, compressions_decompress, compressions_identify and compressions_info.",
           },
         ],
+      },
+      /** Spelled out, or agent discovery sees the links above and leaves every content page out. */
+      {
+        title: "Guide",
+        contentCollection: "docs",
+        contentFilters: [{ field: "path", operator: "LIKE", value: "/guide%" }],
+      },
+      {
+        title: "Formats",
+        contentCollection: "docs",
+        contentFilters: [{ field: "path", operator: "LIKE", value: "/formats%" }],
       },
     ],
   },
@@ -154,24 +173,18 @@ export default defineNuxtConfig({
   },
   nitro: {
     preset: "cloudflare_module",
-    /** One MCP SDK copy, or `agents` fails the toolkit's server on its `instanceof` check. */
-    alias: {
-      "@modelcontextprotocol/sdk": resolve(
-        import.meta.dirname,
-        "node_modules/@modelcontextprotocol/sdk/dist/esm",
-      ),
-    },
     compatibilityDate: "2026-09-03",
     /** Nitro compiles the server bundle for ES2019 unless told otherwise; the library uses BigInt. */
     esbuild: { options: { target: "es2024" } },
-    prerender: {
-      crawlLinks: true,
-      routes: ["/", "/playground", "/sitemap.xml", "/robots.txt", "/llms.txt", "/llms-full.txt"],
-    },
     cloudflare: {
       deployConfig: true,
       nodeCompat: true,
     },
+  },
+  /** Nuxt's own prerender option. The same keys under `nitro.prerender` are deprecated. */
+  prerender: {
+    crawlLinks: true,
+    routes: ["/", "/playground", "/sitemap.xml", "/robots.txt", "/llms.txt", "/llms-full.txt"],
   },
   compatibilityDate: "2026-09-03",
   /** Fonts live in public/fonts and app/assets/fonts.css, where nuxt-og-image reads them from. */

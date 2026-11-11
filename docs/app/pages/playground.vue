@@ -8,7 +8,7 @@ definePageMeta({ layout: "default" });
 
 const title = "Playground";
 const description = `Compress and decompress with any of the ${spellOut(FORMATS.length)} formats, identify bytes nobody named, peel nested layers, or list them all. In the browser, with the same executors the CLI and the agent tools run.`;
-/** The OG pipeline drops commas from its props, so the card gets a version written without them. */
+/** The card cuts a description at 160 characters, and the page's runs past that. */
 const cardDescription = `Compress and decompress and identify with any of the ${spellOut(FORMATS.length)} formats. In the browser with the library itself.`;
 
 useSeo({
@@ -17,6 +17,12 @@ useSeo({
   type: "article",
   breadcrumbs: [{ title: "Playground", path: "/playground" }],
 });
+
+/** `useSeo` points agents at `/playground.md`, a twin this page doesn't have, so the link goes. */
+const dropMarkdownTwin = injectHead().hooks?.hook("tags:resolve", (ctx) => {
+  ctx.tags = ctx.tags.filter((tag) => !(tag.tag === "link" && tag.props.type === "text/markdown"));
+});
+onScopeDispose(() => dropMarkdownTwin?.());
 
 defineOgImage(
   "Docs.takumi",

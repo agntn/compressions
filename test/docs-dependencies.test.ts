@@ -47,7 +47,7 @@ describe("docs dependencies", () => {
       ...Object.keys(manifest.devDependencies ?? {}),
     ]);
     const imported = importedPackages();
-    expect(imported).toContain("docus");
+    expect(imported).toContain("nuxt");
     expect([...imported].filter((name) => !declared.has(name))).toEqual([]);
   });
 });
