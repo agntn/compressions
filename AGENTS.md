@@ -22,14 +22,14 @@ Keep AGENTS.md updated with project status.
 ## Status
 
 - Node.js 26 is the minimum and the only version CI tests and releases on.
-- Not published yet. The first release goes through `pnpm release` and the Publish workflow with GitHub Actions OIDC trusted publishing, without a long-lived registry token.
-- A failed Publish run is recovered with `gh workflow run publish.yml --ref main -f tag=vX.Y.Z`, not a rerun, as in the sibling packages. `test/release.test.ts` pins that ref.
+- Releases go through uppt in `release.yml`, as in the sibling packages. Every push to `main` refreshes a draft release PR whose version and notes come from conventional commits. Merging it tags `vX.Y.Z`, and the run on that tag tests, packs and publishes with GitHub Actions OIDC trusted publishing, without a long-lived registry token. The notes live in GitHub Releases.
+- A failed publish runs again with `gh workflow run release.yml --ref vX.Y.Z`, which repeats test, pack and publish on the tag.
 - Each tool is declared once in `src/tools.ts` with `defineTool` from `@agntn/tools`, and the MCP server, both extensions and `src/ai.ts` take that list through its adapters. The remote server at `compressions.agntn.dev/mcp` takes the same list through `toToolkitTools` and `limitedTools()` from `src/mcp.ts`, so a new tool lands there without an edit (see `docs/AGENTS.md`). Both servers introduce themselves with `serverInfo` from `src/server-info.ts`: name, version, a one-line pitch and the site's icons, so a connector card shows more than a name (#25). That takes `@agntn/tools` 0.2.1, since 0.0.0 dropped `description` and `icons`. Schemas take `Type` from `@agntn/tools`, never from `typebox`.
 - A tool executor throws when it can't answer. The MCP adapter turns the throw into a sanitized `isError` result.
 - The CLI is `runCli` from `@agntn/tools/cli` over the same tool list. `list` is the `info` tool. `compress`, `decompress` and `identify` are package commands in `src/cli-commands.ts`: they read a file or stdin byte for byte and write raw bytes. Their option flags come from the tool schema. `identify` prints the tool's text without the hint about the next call.
 - A local MCP server needs a restart, not `pnpm build`: inside a checkout `dist/cli.mjs` serves `src/mcp.ts` (see Conventions).
 - The CLI never writes raw compressed bytes to a terminal. Decompressed bytes go to stdout, what the stream says about itself to stderr.
-- `pnpm release` and the Publish workflow build before `pnpm test`, as CI does.
+- The tag's test job builds before `pnpm test`, as CI does, and `pack` waits for it. uppt's pack only runs `pnpm pack`, so `dist/` comes from `prepack`. `test/release.test.ts` holds all three.
 - Linting and formatting consume the shared `@agntn/ox` policy. The allow list of `prefer-readonly-parameter-types` in `vite.config.ts` names the classes that are mutated by design (readers, writers, `Output`, the coders).
 - `pnpm-workspace.yaml` exempts `@agntn/*` from `minimumReleaseAge`. `docs/` is a member of that workspace, and every version the library and the site share lives in its `deps` and `dev` catalogs.
 
@@ -42,7 +42,7 @@ Keep AGENTS.md updated with project status.
 - **Test**: `vp test` (bundled Vitest, API from `vite-plus/test`)
 - **Lint**: `vp lint` + `vp fmt` (Oxlint + Oxfmt) through `@agntn/ox`
 - **Typecheck**: tsc (native TypeScript 7)
-- **Release**: changelogen
+- **Release**: uppt
 - **Package manager**: pnpm
 
 ## Scripts
@@ -54,7 +54,6 @@ Keep AGENTS.md updated with project status.
 - `pnpm lint` - build, lint + format check
 - `pnpm fmt` - auto-fix lint + format
 - `pnpm typecheck` - type checking of src, the extensions and the tests
-- `pnpm release` - build, test against that build, and release, in CI's order
 
 ## Structure
 

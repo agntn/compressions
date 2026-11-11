@@ -25,7 +25,7 @@ const transformOverride: object = {
 
 export default defineConfig({
   oxc: { ...transformOverride },
-  fmt: { ...oxfmt, ignorePatterns: ["/CHANGELOG.md", "docs", ".scratch"] },
+  fmt: { ...oxfmt, ignorePatterns: ["docs", ".scratch"] },
   lint: {
     ...oxlint,
     rules: {
