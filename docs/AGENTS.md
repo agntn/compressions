@@ -18,7 +18,7 @@ docs/
 ├── app/composables/               # useLandingSample (one clock for every live panel), useSubNavigation, useCopied, useRosterFlip
 ├── app/utils/                     # formats table (icons, blurbs, groups, containers, sample streams, anatomy, ratio over the library's info()), tools (the agent tools' text), tokens, roster, formatting
 ├── app/pages/playground.vue       # playground, own route outside the docs layout, its own useSeo and OG image
-├── server/routes/sitemap.xml.ts   # Docus sitemap plus the Vue pages it cannot see
+├── server/api/__sitemap__/pages.ts # the Vue pages the Docus sitemap cannot see, for `sitemap.sources`
 ├── server/mcp/index.ts            # the Docus MCP handler at /mcp, introduced like `compressions mcp` by `src/server-info.ts`
 ├── server/mcp/tools/              # one file per tool, each `compressionsMcpTool("<name>")`
 ├── server/utils/compressions-mcp.ts # a tool from `@agntn/compressions/mcp` with the worker's limits
@@ -55,7 +55,7 @@ Versions live in the `deps` and `dev` catalogs of the root `pnpm-workspace.yaml`
 
 `WORKER_LIMITS` in `server/utils/compressions-mcp.ts` holds a call to 262,144 input characters, 4 MiB of output and 256 KiB shown. An isolate gets 128 MB. Under Node at the contract's 64 MiB, a gzip bomb took 135 MB on top of the baseline, `identify` 200 MB and a two layer `peel` 305 MB, and 2.9 MB of random bytes compressed to base64 ran out of a 128 MB V8 heap: `radix2` in `@agntn/encodings` builds its string one character at a time. At the worker's limits a ten layer `peel` of 4 MiB layers holds 40 MB of buffers and the heap stays under 48 MB. Raise a limit only after the same measurement. The tool descriptions keep saying 64 MiB; the error names the limit that hit.
 
-`src/mcp.ts` imports `@agntn/tools` and `@modelcontextprotocol/server`. Both are dependencies here, from the same catalog as the root's, and listed in `vite.resolve.dedupe`. They run on the worker only, so they stay out of `optimizeDeps`. On the `cloudflare_module` preset the toolkit hands its server to `createMcpHandler` from `agents`, which tells an SDK v1 server apart with `instanceof`. pnpm installs one copy of `@modelcontextprotocol/sdk` per `zod` peer it resolves, so the toolkit and `agents` can each get their own and every request fails with "createMcpHandler received an unsupported server". `nitro.alias` points every import of the SDK at the copy in `docs/node_modules`. Keep it until both resolve the same one; `.output/server` should hold one `class McpServer`.
+`src/mcp.ts` imports `@agntn/tools` and `@modelcontextprotocol/server`. Both are dependencies here, from the same catalog as the root's, and listed in `vite.resolve.dedupe`. They run on the worker only, so they stay out of `optimizeDeps`. On the `cloudflare_module` preset the toolkit hands its server to `createLegacyMcpHandler` from `agents`. The `deps` catalog pins `@modelcontextprotocol/sdk` to the version the toolkit asks for, so the toolkit, `agents` and the tests share one copy. After a toolkit bump, check that `.output/server` still holds one `class McpServer`.
 
 The worker decompresses whatever an MCP client sends it and keeps none of it. Workers Logs record the invocation, not the body; keep it that way, no `console` call with tool arguments. The pages still compute everything in the tab, which is what the footer promises.
 
@@ -75,14 +75,14 @@ The worker decompresses whatever an MCP client sends it and keeps none of it. Wo
 ## SEO
 
 - `seo.schema` in `app/app.config.ts` emits the landing JSON-LD: `WebSite`, the agntn `Organization` as publisher, and a free `SoftwareApplication` with `sameAs` on GitHub and npm.
-- `server/routes/sitemap.xml.ts` wraps the Docus sitemap and appends the Vue pages listed in `PAGES`; a new page under `app/pages/` goes there too.
+- The Docus sitemap reads content collections only. `server/api/__sitemap__/pages.ts` hands the Vue pages in `PAGES` to `@nuxtjs/sitemap` through `sitemap.sources`. A new page under `app/pages/` goes there, into `llms.sections` and `agentDiscovery.excludePrefixes` in `nuxt.config.ts`, and drops the markdown link `useSeo` adds, as `playground.vue` does. Skip one and agents go hunting for a `.md` twin that never existed.
 - `public/favicon.svg` is the source, the PNGs and the `.ico` are cut from it with ImageMagick. Both MCP servers show `favicon.svg` and `icon-512.png` as their icons, so `test/mcp.test.ts` fails when either goes missing.
 
 ## OG images
 
 - `app/components/OgImage/Docs.takumi.vue` and `Landing.takumi.vue` override the Docus templates and are rendered by Takumi at build time. Takumi has no CSS variables, so the theme colours are repeated there as literals. A format page's card is built from its `info()`, not from the description.
 - `app/assets/fonts.css` declares the Figtree and Fira Code TTFs in `public/fonts`, which is where nuxt-og-image reads them.
-- Descriptions go without commas and without a trailing period: Docus puts them in the OG file name, where a comma is a separator and `..png` is skipped without a word. A `: ` in a frontmatter description is a YAML mapping and the page vanishes from the prerender.
+- Since Docus 5.15 the OG files are named by a hash, so commas and a final period are fine again. A `: ` in a frontmatter description is still a YAML mapping, and the page vanishes from the prerender.
 
 ## Constraints
 

@@ -15,7 +15,7 @@ const { title, description, headline } = defineProps<{
 
 const { name: siteName } = useSiteConfig();
 
-/** A format page shows its facts. The description would arrive with its commas stripped. */
+/** A format page shows its facts from the library, which say more than its description. */
 const entry = FORMATS.find((row) => row.info.label === title || row.slug === title?.toLowerCase());
 
 const subtitle = entry
