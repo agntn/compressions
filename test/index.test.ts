@@ -119,6 +119,20 @@ describe("the registry", () => {
     );
   });
 
+  it("names an option whose value has no text form", () => {
+    const bare = Object.create(null) as never;
+    const refused = (run: () => unknown, name: string) => {
+      expect(run).toThrow(InvalidOptionError);
+      expect(run).toThrow(`Invalid option ${name}=a value with no text form: `);
+    };
+    for (const info of formatInfos()) {
+      for (const { name, decode } of info.options) {
+        if (info.compress) refused(() => compress(info.name, "hi", { [name]: bare }), name);
+        if (decode) refused(() => decompress(info.name, new Uint8Array(1), { [name]: bare }), name);
+      }
+    }
+  });
+
   it("adds a format that identify then tries", () => {
     const reversed = defineCompression({
       info: {
