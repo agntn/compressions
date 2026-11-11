@@ -1,4 +1,11 @@
-import { indexTools, invokeTool, ToolInputError, wireSchema } from "@agntn/tools";
+import {
+  indexTools,
+  invokeTool,
+  ToolInputError,
+  wireSchema,
+  type ToolCallContext,
+  type ToolDefinition,
+} from "@agntn/tools";
 import {
   createMcpServer as createToolServer,
   errorResult,
@@ -59,6 +66,24 @@ export async function callTool(
       `${tool.name} failed: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
+}
+
+/**
+ * The tools with every call held to `limits`, for a host as tight as a Workers isolate.
+ *
+ * @param {ToolLimits} limits - Limits below the tool contract; the schemas keep the contract's.
+ * @returns {ToolDefinition[]} The tools in `compressionTools` order.
+ */
+export function limitedTools(limits: ToolLimits): ToolDefinition[] {
+  /** Widened: over the union, tsc can't see each wrapper hands its own tool's input back. */
+  const tools: readonly ToolDefinition[] = compressionTools;
+  return tools.map((tool) => ({
+    ...tool,
+    execute: async (input, context) => {
+      const limited: ToolCallContext & CompressionCallContext = { ...context, limits };
+      return await tool.execute(input, limited);
+    },
+  }));
 }
 
 /**
