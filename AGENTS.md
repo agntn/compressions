@@ -31,7 +31,7 @@ Keep AGENTS.md updated with project status.
 - The CLI never writes raw compressed bytes to a terminal. Decompressed bytes go to stdout, what the stream says about itself to stderr.
 - `pnpm release` and the Publish workflow build before `pnpm test`, as CI does.
 - Linting and formatting consume the shared `@agntn/ox` policy. The allow list of `prefer-readonly-parameter-types` in `vite.config.ts` names the classes that are mutated by design (readers, writers, `Output`, the coders).
-- `pnpm-workspace.yaml` exempts `@agntn/*` from `minimumReleaseAge`.
+- `pnpm-workspace.yaml` exempts `@agntn/*` from `minimumReleaseAge`. `docs/` is a member of that workspace, and every version the library and the site share lives in its `deps` and `dev` catalogs.
 
 ## Stack
 
@@ -49,7 +49,7 @@ Keep AGENTS.md updated with project status.
 
 - `pnpm dev` - `obuild --stub`, so `dist` re-exports `src`
 - `pnpm build` - production build
-- `pnpm test` - run tests once. It and `pnpm typecheck` want `pnpm --dir docs install` too: `test/docs-mcp.test.ts` takes Zod, the toolkit and the MCP SDK from `docs/node_modules`
+- `pnpm test` - run tests once. `test/docs-mcp.test.ts` takes Zod, the toolkit and the MCP SDK from `docs/node_modules`, which the root `pnpm install` fills since `docs/` is a workspace member
 - `pnpm test:watch` - run tests in watch mode
 - `pnpm lint` - build, lint + format check
 - `pnpm fmt` - auto-fix lint + format

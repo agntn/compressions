@@ -1,13 +1,11 @@
 import { resolve } from "node:path";
 import { compressionsTheme } from "./shiki-theme";
 
-/** Bundled from the checkout's sources: a deploy needs neither dist/ nor the root node_modules. */
+/** Bundled from the checkout's sources, so a deploy never waits on dist/. */
 const librarySource = resolve(import.meta.dirname, "../src");
 
 export default defineNuxtConfig({
   extends: ["docus"],
-  /** The repo root is its own pnpm workspace; Nuxt must not treat it as this site's. */
-  workspaceDir: import.meta.dirname,
   alias: {
     /** The tool listings and the executor `compressions mcp` serves, for the MCP server at /mcp. */
     "@agntn/compressions/mcp": resolve(librarySource, "mcp.ts"),
@@ -35,10 +33,6 @@ export default defineNuxtConfig({
         "@agntn/encodings/base64",
         "@agntn/encodings/hex",
       ],
-    },
-    server: {
-      /** Dev serves the library from outside the workspace, which Vite refuses without this. */
-      fs: { allow: [resolve(librarySource, "..")] },
     },
   },
   devtools: { enabled: false },
