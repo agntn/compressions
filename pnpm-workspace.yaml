@@ -53,9 +53,9 @@ catalog:
 # One version per name for the library and docs/, which bundles the library from ../src.
 catalogs:
   deps:
-    "@agntn/encodings": 0.2.0
-    "@agntn/hashes": 0.7.2
-    "@agntn/tools": 0.3.0
+    "@agntn/encodings": 0.2.1
+    "@agntn/hashes": 0.7.3
+    "@agntn/tools": 0.3.1
     # What @nuxtjs/mcp-toolkit asks for, so the toolkit, agents and the tests share one SDK.
     "@modelcontextprotocol/sdk": 1.32.0
     "@modelcontextprotocol/server": 2.2.0
