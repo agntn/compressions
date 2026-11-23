@@ -12,7 +12,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import * as zlib from "node:zlib";
-import { describe, expect, it } from "vite-plus/test";
+import { Client } from "@modelcontextprotocol/client";
+import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
+import { afterEach, describe, expect, it } from "vite-plus/test";
 
 const switches = new Set([
   "CI",
@@ -324,6 +326,44 @@ function serve(base: string, extraEnv: Readonly<Record<string, string>> = {}) {
   return { code: status, from, name, stderr };
 }
 
+const clients: Client[] = [];
+
+afterEach(async () => {
+  await Promise.all(clients.splice(0).map((client) => client.close()));
+});
+
+/* An SDK client of one protocol era on `compressions mcp` from the checkout's bin. */
+async function connect(
+  mode: "legacy" | Readonly<{ pin: string }>,
+  extraEnv: Readonly<Record<string, string>>,
+) {
+  const client = new Client(
+    { name: "compressions-test", version: "1.0.0" },
+    { versionNegotiation: { mode } },
+  );
+  clients.push(client);
+  await client.connect(
+    new StdioClientTransport({
+      command: process.execPath,
+      args: [join(root, "dist/cli.mjs"), "mcp"],
+      env: { ...env, ...extraEnv },
+      stderr: "ignore",
+    }),
+  );
+  return client;
+}
+
+const builds = [
+  { from: "source", extraEnv: {} },
+  { from: "bundle", extraEnv: { COMPRESSIONS_DIST: "1" } },
+] as const;
+const toolNames = [
+  "compressions_compress",
+  "compressions_decompress",
+  "compressions_identify",
+  "compressions_info",
+];
+
 /**
  * A run that answered the initialize request.
  * @param from - Where the server has to come from.
@@ -339,6 +379,25 @@ describe.skipIf(!existsSync(join(root, "dist/cli.mjs")))(
     it("serves the live source inside a checkout", () => {
       expect(serve(root)).toMatchObject(served("source"));
     });
+
+    it.each(builds)("lets a client pinned to 2026 listen, from the $from", async ({ extraEnv }) => {
+      const client = await connect({ pin: "2026-07-28" }, extraEnv);
+
+      expect(client.getNegotiatedProtocolVersion()).toBe("2026-07-28");
+      const subscription = await client.listen({ toolsListChanged: true });
+      expect((await client.listTools()).tools.map((tool) => tool.name)).toEqual(toolNames);
+      await subscription.close();
+    });
+
+    it.each(builds)(
+      "still opens a 2025 client with initialize, from the $from",
+      async ({ extraEnv }) => {
+        const client = await connect("legacy", extraEnv);
+
+        expect(client.getNegotiatedProtocolVersion()).toMatch(/^2025-/u);
+        expect((await client.listTools()).tools.map((tool) => tool.name)).toEqual(toolNames);
+      },
+    );
 
     it("keeps the bundle under COMPRESSIONS_DIST=1", () => {
       expect(serve(root, { COMPRESSIONS_DIST: "1" })).toMatchObject(served("bundle"));
